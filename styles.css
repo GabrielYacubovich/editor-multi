@@ -1,0 +1,487 @@
+/* Container for the entire layout */
+.editor {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: 100vh;
+    padding: 10px; /* Added padding for better edge spacing */
+}
+
+/* Container for image and controls */
+#content {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 1200px;
+    gap: 20px; /* Controlled gap between image and controls */
+}
+
+/* Image container */
+#image-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 70%; /* Reduced from 80% */
+    padding-right: 20px; /* Reduced from 50px */
+}
+
+/* Canvas styling */
+#canvas {
+    image-rendering: auto;
+    max-width: 1920px;
+    width: 100%;
+    height: auto;
+    margin: 0 auto;
+    cursor: pointer;
+    display: block;
+}
+
+/* Controls container */
+#controls-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    width: 30%; /* Adjusted from 40% */
+    min-width: 250px; /* Ensures controls don’t collapse too much */
+}
+
+/* Controls (sliders and labels) */
+.controls {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 10px; /* Added padding */
+}
+
+/* Each control (slider + label + value) */
+.controls div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 5px; /* Reduced from 8px */
+    width: 100%;
+}
+
+.controls label {
+    flex: 0 0 90px; /* Reduced from 100px */
+    margin-right: 5px; /* Reduced from 10px */
+    font-size: 13px; /* Slightly smaller */
+}
+
+.controls input[type="range"] {
+    flex: 1;
+    max-width: 140px; /* Reduced from 150px */
+    margin: 0 5px; /* Reduced from 10px */
+}
+
+.controls span {
+    flex: 0 0 35px; /* Reduced from 40px */
+    font-size: 13px; /* Smaller font */
+    font-weight: bold;
+    text-align: right;
+}
+
+/* Complex Filters Header */
+.controls h3 {
+    margin: 15px 0 5px; /* Reduced from 20px 0 10px */
+    font-size: 15px; /* Reduced from 16px */
+    font-weight: bold;
+    color: #333;
+}
+
+/* Action buttons */
+.action-buttons {
+    margin-top: 10px; /* Reduced from 20px */
+    display: flex;
+    gap: 5px; /* Reduced from 10px */
+    flex-wrap: wrap;
+}
+
+.action-buttons button,
+#upload-new-photo,
+#toggle-original {
+    padding: 8px 15px; /* Reduced from 10px 20px */
+    background-color: #000;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+    max-width: 100px; /* Reduced from 120px */
+    min-height: 40px; /* Reduced from 44px */
+    box-sizing: border-box;
+    font-size: 13px; /* Reduced from 14px */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.action-buttons button:hover,
+#upload-new-photo:hover,
+#toggle-original:hover {
+    background-color: #3a3a3a;
+}
+
+.action-buttons button:active,
+#upload-new-photo:active,
+#toggle-original:active {
+    background-color: #555;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+.modal-content {
+    position: relative;
+    margin: 2% auto;
+    width: 95%;
+    max-width: 1200px;
+    padding: 15px; /* Reduced from 20px */
+    background-color: #fff;
+    box-sizing: border-box;
+    border-radius: 8px; /* Reduced from 10px */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 30px;
+    color: #333;
+    cursor: pointer;
+}
+
+.modal-close-btn:hover {
+    color: #ff0000;
+}
+
+/* Image Modal Specific */
+#image-modal .modal-inner {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 15px; /* Reduced from 20px */
+}
+
+#modal-image {
+    max-width: 70%;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+#modal-controls {
+    width: 30%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+/* Crop Modal Specific */
+#crop-canvas {
+    max-width: 100%;
+    max-height: 70vh;
+    display: block;
+    margin: 0 auto;
+}
+
+#crop-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Reduced from 15px */
+    width: 100%;
+    max-width: 400px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    margin: 10px auto 0;
+}
+
+.crop-control-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.crop-control-group label {
+    flex: 0 0 80px;
+    font-size: 14px;
+}
+
+.crop-control-group input[type="range"] {
+    flex: 1;
+    margin: 0 10px;
+}
+
+.crop-control-group span {
+    flex: 0 0 40px;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: right;
+    cursor: pointer;
+}
+
+.crop-button-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px; /* Reduced from 10px */
+}
+
+.crop-button-group button {
+    flex: 1;
+    padding: 8px; /* Reduced from 10px */
+    background-color: #000;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+.crop-button-group button:hover {
+    background-color: #3a3a3a;
+}
+
+.crop-lock-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.crop-lock-group input[type="checkbox"] {
+    margin: 0;
+}
+
+.crop-lock-group label {
+    font-size: 14px;
+}
+
+/* Preview Modal Specific */
+#preview-modal .image-container {
+    position: relative;
+    display: inline-block;
+    text-align: center;
+}
+
+#preview-image {
+    max-width: 80vw;
+    max-height: 80vh;
+    display: block;
+    border: 2px solid #333;
+}
+
+#preview-image:hover {
+    max-width: 800px;
+    max-height: 800px;
+    transition: max-width 0.3s, max-height 0.3s;
+}
+
+#preview-dimensions {
+    margin: 5px 0 0;
+    font-size: 14px;
+    color: #333;
+}
+
+/* Download Modal (Dynamic) Specific */
+#download-modal-content {
+    max-width: 500px;
+}
+
+#download-modal-content h3 {
+    margin: 0 0 15px;
+    font-size: 18px;
+}
+
+#download-modal-content label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+#download-modal-content input,
+#download-modal-content select {
+    width: 100%;
+    padding: 5px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+#file-info {
+    margin-bottom: 15px;
+}
+
+#file-info p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+/* Loading Indicator */
+#loading-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    z-index: 1003;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .editor {
+        padding: 5px; /* Reduced padding on mobile */
+    }
+
+    #content {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px; /* Reduced from implied larger spacing */
+    }
+
+    #image-container {
+        width: 100%;
+        padding-right: 0;
+        margin-bottom: 10px; /* Reduced from 20px */
+    }
+
+    #controls-container {
+        width: 100%;
+        min-width: unset; /* Remove min-width on mobile */
+    }
+
+    .controls {
+        padding: 5px; /* Reduced from 10px */
+    }
+
+    .controls div {
+        flex-direction: row; /* Changed to row for better mobile UX */
+        align-items: center;
+        margin-bottom: 4px; /* Reduced from 5px */
+    }
+
+    .controls label {
+        flex: 0 0 80px; /* Reduced from 90px */
+        margin-right: 5px;
+        margin-bottom: 0; /* Reset from column layout */
+        font-size: 12px; /* Smaller font */
+    }
+
+    .controls input[type="range"] {
+        max-width: 100%;
+        margin: 0 5px;
+    }
+
+    .controls span {
+        flex: 0 0 30px; /* Reduced from 35px */
+        margin-top: 0; /* Reset from column layout */
+        font-size: 12px; /* Smaller font */
+    }
+
+    .controls h3 {
+        margin: 10px 0 5px; /* Reduced spacing */
+        font-size: 14px; /* Reduced from 15px */
+    }
+
+    .action-buttons {
+        margin-top: 5px; /* Reduced from 10px */
+        flex-direction: row; /* Keep row with wrapping */
+        gap: 5px;
+        justify-content: center;
+    }
+
+    .action-buttons button,
+    #upload-new-photo,
+    #toggle-original {
+        max-width: 90px; /* Reduced from 200px */
+        padding: 6px 10px; /* Reduced from 8px 15px */
+        font-size: 12px; /* Reduced from 13px */
+        min-height: 36px; /* Reduced from 40px */
+    }
+
+    /* Modal Responsiveness */
+    .modal-content {
+        width: 90%;
+        margin: 5% auto;
+        padding: 10px; /* Reduced from 15px */
+    }
+
+    #image-modal .modal-inner {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px; /* Reduced from 15px */
+    }
+
+    #modal-image {
+        max-width: 100%;
+    }
+
+    #modal-controls {
+        width: 100%;
+        padding: 5px; /* Reduced from 10px */
+    }
+
+    #crop-canvas {
+        max-width: 90vw;
+        max-height: 60vh;
+    }
+
+    #crop-controls {
+        max-width: 100%;
+        padding: 5px; /* Reduced from 10px */
+        gap: 5px; /* Reduced from 10px */
+    }
+
+    .crop-control-group {
+        flex-direction: row; /* Changed to row for consistency */
+        align-items: center;
+    }
+
+    .crop-control-group label {
+        flex: 0 0 70px; /* Reduced from 80px */
+        margin-bottom: 0; /* Reset from column layout */
+        font-size: 12px; /* Smaller font */
+    }
+
+    .crop-control-group input[type="range"] {
+        width: 100%;
+        margin: 0 5px; /* Adjusted */
+    }
+
+    .crop-control-group span {
+        flex: 0 0 35px; /* Reduced from 40px */
+        margin-top: 0; /* Reset from column layout */
+        font-size: 12px; /* Smaller font */
+    }
+
+    .crop-button-group {
+        flex-direction: row; /* Keep row with wrapping */
+        gap: 5px;
+    }
+
+    .crop-button-group button {
+        padding: 6px; /* Reduced from 8px */
+        width: 100%;
+    }
+
+    #download-modal-content {
+        max-width: 90%;
+    }
+}
