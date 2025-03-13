@@ -2,7 +2,7 @@ import { showLoadingIndicator } from './domUtils.js';
 
 // Basic Filters (unchanged, matches old behavior)
 function applyBasicFiltersManually(ctx, canvas, settings) {
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     const brightnessFactor = (settings.brightness - 100) / 100 + 1;
     const exposureFactor = (settings.exposure - 100) / 100 + 1;
