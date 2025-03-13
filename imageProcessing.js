@@ -50,8 +50,17 @@ function applyBasicFiltersManually(ctx, canvas, settings) {
 
 function redrawImage(
     ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-    isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false
+    isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false,saveImageStateCallback
 ) {
+    if (!img || !fullResCanvas) {
+        console.error("redrawImage: img or fullResCanvas is undefined");
+        showLoadingIndicator(false);
+        return Promise.reject("Missing img or fullResCanvas");
+        
+    }
+    if (saveState && saveImageStateCallback) {
+        saveImageStateCallback();
+    } 
     showLoadingIndicator(true);
     fullResCanvas.width = img.width;
     fullResCanvas.height = img.height;
