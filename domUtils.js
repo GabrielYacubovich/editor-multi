@@ -59,4 +59,4 @@ function showLoadingIndicator(show = true) {
     }
 }
 
-export { closeModal, setupModal, closeModalHandler, outsideClickHandler, showLoadingIndicator };
+export { closeModal, setupModal, showLoadingIndicator };
