@@ -199,12 +199,20 @@ function seededRandom(seed) {
 }
 
 toggleOriginalButton.addEventListener('click', () => {
-    if (!originalImageData) {
-        return;
-    }
+    if (!originalImageData) return;
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    redrawImage(false);
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, true
+    )
+        .then(() => {
+            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+        })
+        .finally(() => {
+            closeModal(cropModal);
+            uploadNewPhotoButton.style.display = 'block';
+        });
 });
 toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
@@ -849,7 +857,10 @@ img.onload = function () {
         originalUploadedImage.src = img.src;
     } else {
     }
-    redrawImage(true).then(() => {
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, true
+    ).then(() => {
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
     }).catch(err => {
         console.error("Failed to redraw image on load:", err);
