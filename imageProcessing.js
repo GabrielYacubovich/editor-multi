@@ -358,15 +358,27 @@ function redrawImage(
     ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
     isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
 ) {
-    if (!img || !fullResCanvas) {
-        console.error("redrawImage: img or fullResCanvas is undefined");
+    if (!img) {
+        console.error("redrawImage: img is undefined or null");
         showLoadingIndicator(false);
-        return Promise.reject("Missing img or fullResCanvas");
+        return Promise.reject("Missing img");
     }
+    if (!img.complete || img.naturalWidth === 0) {
+        console.error("redrawImage: img is not loaded or has invalid dimensions", img.src);
+        showLoadingIndicator(false);
+        return Promise.reject("Image not loaded");
+    }
+    if (!fullResCanvas) {
+        console.error("redrawImage: fullResCanvas is undefined or null");
+        showLoadingIndicator(false);
+        return Promise.reject("Missing fullResCanvas");
+    }
+
     showLoadingIndicator(true);
     fullResCanvas.width = img.width;
     fullResCanvas.height = img.height;
     if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
+        console.error("redrawImage: Invalid canvas dimensions", fullResCanvas.width, fullResCanvas.height);
         showLoadingIndicator(false);
         return Promise.reject("Invalid canvas dimensions");
     }
@@ -399,6 +411,10 @@ function redrawImage(
                 saveImageStateCallback();
             }
             showLoadingIndicator(false);
+        }).catch(err => {
+            console.error("redrawImage failed during processing:", err);
+            showLoadingIndicator(false);
+            throw err; // Re-throw to propagate the error
         });
 }
 

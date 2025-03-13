@@ -459,11 +459,13 @@ function setupCropControls(unfilteredCanvas) {
         closeModal(cropModal);
         uploadNewPhotoButton.style.display = 'block';
         const proceedWithRedraw = () => {
-            redrawImage(true)
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, true
+            )
                 .then(() => {
                     originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                })
-                
+                });
         };
         if (img.complete && img.naturalWidth !== 0) {
             proceedWithRedraw();
@@ -857,7 +859,7 @@ img.onload = function () {
     }
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, true
+        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
     ).then(() => {
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
     }).catch(err => {
@@ -999,8 +1001,6 @@ downloadButton.addEventListener('click', () => {
     fileTypeSelect.addEventListener('change', updateFileInfo);
 
     const saveConfirmBtn = document.getElementById('save-confirm');
-    const saveCancelBtn = document.getElementById('save-cancel');
-
     saveConfirmBtn.addEventListener('click', () => {
         const fileName = document.getElementById('save-file-name').value.trim() || 'nueva-imagen';
         const fileType = fileTypeSelect.value;
@@ -1008,6 +1008,7 @@ downloadButton.addEventListener('click', () => {
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
         showLoadingIndicator(true);
+
         if (!isEdited && scale === 1.0) {
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
@@ -1018,13 +1019,19 @@ downloadButton.addEventListener('click', () => {
             document.body.removeChild(overlay);
             return;
         }
+
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = Math.round(originalWidth * scale);
         tempCanvas.height = Math.round(originalHeight * scale);
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-        redrawImage(false).then(() => {
+
+        // Pass all required parameters to redrawImage
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        ).then(() => {
             tempCtx.drawImage(fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
             const quality = fileType === 'image/png' ? undefined : 1.0;
             tempCanvas.toBlob((blob) => {
@@ -1038,10 +1045,11 @@ downloadButton.addEventListener('click', () => {
                 document.body.removeChild(overlay);
             }, fileType, quality);
         }).catch(error => {
+            console.error("Download failed:", error);
             showLoadingIndicator(false);
             document.body.removeChild(popup);
             document.body.removeChild(overlay);
-        })
+        });
     });
     saveConfirmBtn.addEventListener('touchend', (e) => {
         e.preventDefault();
@@ -1207,15 +1215,19 @@ if (img.complete && img.naturalWidth !== 0) {
             });
         }
     }
-redrawImage(true)
-    .then(() => {
-        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-    })
-    .finally(() => {
-        closeModal(cropModal);
-        uploadNewPhotoButton.style.display = 'block';
-    });
-    
+    if (img.complete && img.naturalWidth !== 0) {
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+        )
+            .then(() => {
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+            })
+            .finally(() => {
+                closeModal(cropModal);
+                uploadNewPhotoButton.style.display = 'block';
+            });
+    }
     let isDraggingSlider = false;
     let tempSettings = {};
     controls.forEach(control => {
