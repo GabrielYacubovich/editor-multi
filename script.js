@@ -204,9 +204,11 @@ toggleOriginalButton.addEventListener('click', () => {
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
     );
-});toggleOriginalButton.addEventListener('touchend', (e) => {
+});
+
+toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     if (!originalImageData) return;
     isShowingOriginal = !isShowingOriginal;
@@ -1168,13 +1170,19 @@ restoreButton.addEventListener('click', () => {
     fullResCanvas.width = originalWidth;
     fullResCanvas.height = originalHeight;
     fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-    redrawImage(true).then(() => {
-        originalFullResImage.src = fullResCanvas.toDataURL('image/png'); 
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+    ).then(() => {
+        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
     });
 });
 if (img.complete && img.naturalWidth !== 0) {
-    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true)
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+    )
         .then(() => {
             originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         })
@@ -1182,7 +1190,21 @@ if (img.complete && img.naturalWidth !== 0) {
             closeModal(cropModal);
             uploadNewPhotoButton.style.display = 'block';
         });
-}
+} else {
+    img.onload = () => {
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+        )
+            .then(() => {
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+            })
+            .finally(() => {
+                closeModal(cropModal);
+                uploadNewPhotoButton.style.display = 'block';
+            });
+        }
+    }
 redrawImage(true)
     .then(() => {
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
