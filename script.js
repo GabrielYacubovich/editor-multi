@@ -276,9 +276,13 @@ function setupCropControls(unfilteredCanvas) {
         rotation = 0;
         rotationInput.value = 0;
         rotationValue.textContent = '0°';
+    
         if (!trueOriginalImage.src || trueOriginalImage.width === 0) {
+            console.error("Restore failed: trueOriginalImage is not valid", trueOriginalImage);
             return;
         }
+    
+        // Calculate canvas dimensions
         const maxCanvasWidth = window.innerWidth - 100;
         const maxCanvasHeight = window.innerHeight - 250;
         let width = trueOriginalImage.width;
@@ -293,23 +297,48 @@ function setupCropControls(unfilteredCanvas) {
                 width = height * ratio;
             }
         }
-        cropCanvas.width = width;
-        cropCanvas.height = height;
+    
+        // Set canvas dimensions
+        cropCanvas.width = Math.round(width);
+        cropCanvas.height = Math.round(height);
+        cropCanvas.dataset.scaleFactor = 1; // Reset scale factor since no rotation
         cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
+    
+        // Apply filters to temp canvas
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = trueOriginalImage.width;
         tempCanvas.height = trueOriginalImage.height;
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.drawImage(trueOriginalImage, 0, 0);
+    
+        // Chain filter applications and ensure image load
         applyBasicFiltersManually(tempCtx, tempCanvas, settings);
-        applyAdvancedFilters(tempCtx, tempCanvas, noiseSeed, 1)
-            .then(() => applyGlitchEffects(tempCtx, tempCanvas, noiseSeed, 1))
-            .then(() => applyComplexFilters(tempCtx, tempCanvas, noiseSeed, 1))
+        applyAdvancedFilters(tempCtx, tempCanvas, settings, noiseSeed, 1)
+            .then(() => applyGlitchEffects(tempCtx, tempCanvas, settings, noiseSeed, 1))
+            .then(() => applyComplexFilters(tempCtx, tempCanvas, settings, noiseSeed, 1))
             .then(() => {
-                cropImage.src = tempCanvas.toDataURL('image/png');
-                cropImage.onload = () => drawCropOverlay();
-                if (cropImage.complete && cropImage.naturalWidth !== 0) cropImage.onload();
+                const dataURL = tempCanvas.toDataURL('image/png');
+                return new Promise((resolve) => {
+                    cropImage.src = dataURL;
+                    if (cropImage.complete && cropImage.naturalWidth !== 0) {
+                        resolve();
+                    } else {
+                        cropImage.onload = resolve;
+                        cropImage.onerror = () => {
+                            console.error("cropImage failed to load after restore");
+                            resolve(); // Proceed anyway to avoid hanging
+                        };
+                    }
+                });
             })
+            .then(() => {
+                console.log("cropImage loaded:", cropImage.src, cropImage.naturalWidth, cropImage.naturalHeight);
+                drawCropOverlay();
+            })
+            .catch(err => {
+                console.error("Error during restore operation:", err);
+                drawCropOverlay(); // Draw anyway to show something
+            });
     });
 
     confirmBtn.addEventListener('click', (e) => {
@@ -489,6 +518,7 @@ const stopDragHandler = () => stopCropDrag();
     document.addEventListener('touchend', stopDragHandler);
         
     function drawCropOverlay() {
+        cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
         const originalWidth = cropImage.width;
         const originalHeight = cropImage.height;
         const angleRad = rotation * Math.PI / 180;
