@@ -110,36 +110,42 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModal(document.getElementById('preview-modal'), true); 
 });
 function showCropModal(dataURL = null) {
+    cropModal.style.display = 'block';
+    
     if (!dataURL) {
-        // Existing logic for re-showing crop modal with current image
-        cropModal.style.display = 'block';
+        // Re-show crop modal with current image
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = trueOriginalImage.width;
         tempCanvas.height = trueOriginalImage.height;
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.drawImage(trueOriginalImage, 0, 0);
         applyBasicFiltersManually(tempCtx, tempCanvas, settings);
-        applyAdvancedFilters(tempCtx, tempCanvas, noiseSeed, 1)
-            .then(() => applyGlitchEffects(tempCtx, tempCanvas, noiseSeed, 1))
-            .then(() => applyComplexFilters(tempCtx, tempCanvas, noiseSeed, 1))
+        return applyAdvancedFilters(tempCtx, tempCanvas, settings, noiseSeed, 1)
+            .then(() => applyGlitchEffects(tempCtx, tempCanvas, settings, noiseSeed, 1))
+            .then(() => applyComplexFilters(tempCtx, tempCanvas, settings, noiseSeed, 1))
             .then(() => {
                 cropImage.src = tempCanvas.toDataURL('image/png');
-                cropImage.onload = () => {
+                return new Promise((resolve) => {
+                    if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
+                    else cropImage.onload = resolve;
+                }).then(() => {
                     rotation = initialRotation;
                     setupCropControls(null);
                     drawCropOverlay();
-                };
+                });
             });
     } else {
         // New image uploaded
         originalUploadedImage.src = dataURL;
         cropImage.src = dataURL;
-        rotation = 0;
-        initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
-        initialRotation = 0;
-        cropModal.style.display = 'block';
-        cropImage.onload = () => {
-            // Reset cropRect explicitly to full canvas size after sizing
+        return new Promise((resolve) => {
+            if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
+            else cropImage.onload = resolve;
+        }).then(() => {
+            rotation = 0;
+            initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
+            initialRotation = 0;
+            
             const maxCanvasWidth = window.innerWidth - 100;
             const maxCanvasHeight = window.innerHeight - 250;
             const originalWidth = cropImage.width;
@@ -153,16 +159,11 @@ function showCropModal(dataURL = null) {
             cropCanvas.width = Math.round(fullRotatedWidth * scale);
             cropCanvas.height = Math.round(fullRotatedHeight * scale);
             cropCanvas.dataset.scaleFactor = scale;
-
-            // Explicitly set cropRect to full canvas dimensions
             cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
-
+            
             setupCropControls(null);
             drawCropOverlay();
-        };
-    }
-    if (cropImage.complete && cropImage.naturalWidth !== 0) {
-        cropImage.onload();
+        });
     }
 }
 uploadNewPhotoButton.addEventListener('click', (e) => {
@@ -367,13 +368,14 @@ function setupCropControls(unfilteredCanvas) {
         originalImageData = previewTempCtx.getImageData(0, 0, canvas.width, canvas.height);
         initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
         initialRotation = rotation;
-        const loadImage = new Promise((resolve) => {
+        const loadImage = new Promise((resolve, reject) => {
             if (img.complete && img.naturalWidth !== 0) resolve();
             else {
                 img.onload = resolve;
-                img.onerror = () => resolve();
+                img.onerror = reject;
             }
         });
+        
         loadImage.then(() => {
             const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
             const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
@@ -1108,7 +1110,20 @@ function handleRedo(e) {
             input.value = settings[input.id];
         });
         updateControlIndicators();
-        redrawImage(false);
+        
+        // Use cropImage if crop modal is open, otherwise use img
+        const activeImage = (cropModal.style.display === 'block' && cropImage.complete && cropImage.naturalWidth !== 0) ? cropImage : img;
+        if (!activeImage || !activeImage.complete || activeImage.naturalWidth === 0) {
+            console.error("handleRedo: No valid image available", activeImage);
+            return;
+        }
+        
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, activeImage, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        ).catch(err => {
+            console.error("Redo failed:", err);
+        });
     }
 }
 const debouncedUndo = debounce(handleUndo, 200);
