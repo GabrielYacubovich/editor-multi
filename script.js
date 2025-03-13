@@ -2,7 +2,7 @@ import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const controls = document.querySelectorAll('.controls input');
 const undoButton = document.getElementById('undo');
 const redoButton = document.getElementById('redo');
@@ -21,7 +21,7 @@ let img = new Image();
 let originalImageData = null;
 let noiseSeed = Math.random();
 let fullResCanvas = document.createElement('canvas');
-let fullResCtx = fullResCanvas.getContext('2d');
+let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
 let isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
@@ -1173,6 +1173,16 @@ restoreButton.addEventListener('click', () => {
         ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
     });
 });
+if (img.complete && img.naturalWidth !== 0) {
+    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true)
+        .then(() => {
+            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+        })
+        .finally(() => {
+            closeModal(cropModal);
+            uploadNewPhotoButton.style.display = 'block';
+        });
+}
 redrawImage(true)
     .then(() => {
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
