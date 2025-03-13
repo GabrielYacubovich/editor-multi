@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
         trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
         settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-        previewWidth, previewHeight, uploadNewPhotoButton // Add this
+        previewWidth, previewHeight, uploadNewPhotoButton,downloadButton // Add this
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
@@ -276,6 +276,11 @@ if (window.Worker) {
 }
 
 downloadButton.addEventListener('click', () => {
+    console.log("Download button clicked, disabled state:", downloadButton.disabled);
+    if (downloadButton.disabled) {
+        console.warn("Download button is disabled - image may not be loaded or processed yet.");
+        return;
+    }    
     const isEdited = Object.values(settings).some(value => value !== 100 && value !== 0);
     const popup = document.createElement('div');
     popup.style.position = 'fixed';

@@ -23,7 +23,7 @@ function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-       previewWidth, previewHeight, uploadNewPhotoButton } = options); // Add uploadNewPhotoButton
+       previewWidth, previewHeight, uploadNewPhotoButton,downloadButton } = options); // Add uploadNewPhotoButton
     setupModal(cropModal, false);
 }
 
