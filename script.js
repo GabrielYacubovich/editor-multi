@@ -10,6 +10,7 @@ const undoButton = document.getElementById('undo');
 const redoButton = document.getElementById('redo');
 const restoreButton = document.getElementById('restore');
 const downloadButton = document.getElementById('download');
+downloadButton.disabled = true; // Disable by default
 const cropImageButton = document.getElementById('crop-image-button');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
 const toggleOriginalButton = document.getElementById('toggle-original');
@@ -169,7 +170,7 @@ img.onload = function () {
     const maxDisplayHeight = window.innerHeight - (window.innerWidth <= 768 ? 0.4 * window.innerHeight + 20 : 250);
     const minPreviewDimension = 400;
     const ratio = originalWidth / originalHeight;
-
+    downloadButton.disabled = false;
     if (window.innerWidth <= 768) {
         previewHeight = Math.min(originalHeight, maxDisplayHeight);
         previewWidth = previewHeight * ratio;
@@ -228,6 +229,7 @@ img.onload = function () {
         console.error("Failed to redraw image on load:", err);
     });
     uploadNewPhotoButton.style.display = 'block';
+    
 };
 
 let filterWorker;
@@ -377,7 +379,10 @@ downloadButton.addEventListener('click', () => {
     
         if (!originalWidth || !originalHeight) {
             console.error("Invalid dimensions for download:", originalWidth, originalHeight);
-            alert("Cannot download: Image dimensions are invalid.");
+            alert("Cannot download: No image has been loaded or processed yet.");
+            showLoadingIndicator(false); // Ensure loading indicator is hidden
+            document.body.removeChild(popup);
+            document.body.removeChild(overlay);
             return;
         }
     

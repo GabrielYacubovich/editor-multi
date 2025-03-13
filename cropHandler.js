@@ -211,7 +211,10 @@ function setupCropControls(unfilteredCanvas) {
         closeModal(cropModal);
         let origWidth = cropImage.width;
         let origHeight = cropImage.height;
-        if (origWidth === 0 || origHeight === 0) return;
+        if (origWidth === 0 || origHeight === 0) {
+            console.error("Crop confirmation failed: Invalid cropImage dimensions", origWidth, origHeight);
+            return;
+        }
         const angleRad = rotation * Math.PI / 180;
         const cosA = Math.abs(Math.cos(angleRad));
         const sinA = Math.abs(Math.sin(angleRad));
