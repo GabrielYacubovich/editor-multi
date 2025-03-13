@@ -1126,8 +1126,24 @@ function handleUndo(e) {
             input.value = settings[input.id];
         });
         updateControlIndicators();
-        redrawImage(false);
+
+        // Verify img is valid
+        if (!img || !img.complete || img.naturalWidth === 0) {
+            console.error("handleUndo: img is invalid", img);
+            return; // Exit early if img isn’t ready
+        }
+
+        console.log("handleUndo - Applying previous settings:", settings);
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        ).then(() => {
+            console.log("Undo redraw completed successfully");
+        }).catch(err => {
+            console.error("Undo redraw failed:", err);
+        });
     } else {
+        console.log("handleUndo: No previous state to undo");
     }
 }
 function handleRedo(e) {

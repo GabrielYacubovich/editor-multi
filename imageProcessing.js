@@ -354,12 +354,20 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 }
 
 // Redraw Image (unchanged, works with updated filters)
-function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback) {
-    console.log("redrawImage called with img:", img, "src:", img?.src, "complete:", img?.complete, "naturalWidth:", img?.naturalWidth);
+function redrawImage(
+    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+    isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
+) {
+    console.log("redrawImage - img:", img, "settings:", settings);
     if (!img) {
         console.error("redrawImage: img is undefined or null");
         showLoadingIndicator(false);
         return Promise.reject("Missing img");
+    }
+    if (!img.complete || img.naturalWidth === 0) {
+        console.error("redrawImage: img is not loaded or has invalid dimensions", img.src);
+        showLoadingIndicator(false);
+        return Promise.reject("Image not loaded");
     }
     showLoadingIndicator(true);
     fullResCanvas.width = img.width;
