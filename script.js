@@ -1,3 +1,6 @@
+import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
+import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
+
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const controls = document.querySelectorAll('.controls input');
