@@ -1,21 +1,15 @@
-function closeModal(modalElement) {function closeModal(modalElement) {
+function closeModal(modalElement) {
     modalElement.style.display = 'none';
     if (modalElement === cropModal) {
-        isDragging = false;
+        isDragging = false; // Assumes global `isDragging`
         cropCanvas.style.cursor = 'default';
         uploadNewPhotoButton.style.display = 'block';
-        if (isTriggering) {
-            cleanupFileInput();
-        }
     }
-}
-modalElement.style.display = 'none';
-
-
     if (modalElement === modal) {
         document.getElementById('modal-controls').innerHTML = '';
     }
 }
+
 function setupModal(modalElement, allowOutsideClick = false) {
     const closeBtn = modalElement.querySelector('.modal-close-btn');
     if (closeBtn) {
