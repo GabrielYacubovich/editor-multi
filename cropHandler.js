@@ -1,4 +1,3 @@
-let uploadNewPhotoButton; // Add this at the top of cropHandler.js
 // cropHandler.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
@@ -20,10 +19,7 @@ let settings, noiseSeed, isShowingOriginal; // To be set via initialize
 let originalWidth, originalHeight, previewWidth, previewHeight; // To be set via initialize
 
 function initializeCropHandler(options) {
-    ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
-       trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-       settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-       previewWidth, previewHeight, uploadNewPhotoButton } = options); // Add uploadNewPhotoButton
+    ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, previewWidth, previewHeight } = options);
     setupModal(cropModal, false);
 }
 
@@ -211,10 +207,7 @@ function setupCropControls(unfilteredCanvas) {
         closeModal(cropModal);
         let origWidth = cropImage.width;
         let origHeight = cropImage.height;
-        if (origWidth === 0 || origHeight === 0) {
-            console.error("Crop confirmation failed: Invalid cropImage dimensions", origWidth, origHeight);
-            return;
-        }
+        if (origWidth === 0 || origHeight === 0) return;
         const angleRad = rotation * Math.PI / 180;
         const cosA = Math.abs(Math.cos(angleRad));
         const sinA = Math.abs(Math.sin(angleRad));
@@ -364,7 +357,6 @@ function setupCropControls(unfilteredCanvas) {
             )
                 .then(() => {
                     originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                    downloadButton.disabled = false; // Enable download button
                 });
         };
         if (img.complete && img.naturalWidth !== 0) {
