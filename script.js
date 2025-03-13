@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
         trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
         settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-        previewWidth, previewHeight, uploadNewPhotoButton // Add this
+        previewWidth, previewHeight, uploadNewPhotoButton,downloadButton // Add this
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
