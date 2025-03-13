@@ -3,7 +3,9 @@ import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 
 // DOM elements (passed from script.js)
-let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage;
+let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
+    trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
+    uploadNewPhotoButton; // Add uploadNewPhotoButton here
 
 // State variables (passed from script.js or managed internally)
 let cropImage = new Image();
@@ -19,7 +21,7 @@ let settings, noiseSeed, isShowingOriginal; // To be set via initialize
 let originalWidth, originalHeight, previewWidth, previewHeight; // To be set via initialize
 
 function initializeCropHandler(options) {
-    ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, previewWidth, previewHeight } = options);
+    ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, previewWidth, previewHeight,uploadNewPhotoButton } = options);
     setupModal(cropModal, false);
 }
 
@@ -263,10 +265,10 @@ function setupCropControls(unfilteredCanvas) {
         });
         loadImage.then(() => {
             originalWidth = tempCanvas.width;
-        originalHeight = tempCanvas.height;
-        fullResCanvas.width = originalWidth;
-        fullResCanvas.height = originalHeight;
-        fullResCtx.drawImage(tempCanvas, 0, 0, originalWidth, originalHeight);
+            originalHeight = tempCanvas.height;
+            fullResCanvas.width = originalWidth;
+            fullResCanvas.height = originalHeight;
+            fullResCtx.drawImage(tempCanvas, 0, 0, originalWidth, originalHeight);
             const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
             const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
             const minPreviewDimension = 800;
@@ -303,7 +305,11 @@ function setupCropControls(unfilteredCanvas) {
                 originalFullResImage.src = fullResCanvas.toDataURL('image/png');
             }).finally(() => {
                 closeModal(cropModal);
-                uploadNewPhotoButton.style.display = 'block';
+                if (uploadNewPhotoButton) { // Check if defined
+                    uploadNewPhotoButton.style.display = 'block';
+                } else {
+                    console.warn("uploadNewPhotoButton is not defined in confirmBtn listener");
+                }
             });
         }).catch(err => {
             console.error("Image load failed:", err);
@@ -367,6 +373,11 @@ function setupCropControls(unfilteredCanvas) {
                 img.onerror = () => resolve();
             });
             loadImage.then(proceedWithRedraw);
+        }
+        if (uploadNewPhotoButton) { // Check if defined
+            uploadNewPhotoButton.style.display = 'block';
+        } else {
+            console.warn("uploadNewPhotoButton is not defined in skipBtn listener");
         }
     });
     lockCheckbox.addEventListener('change', (e) => {
