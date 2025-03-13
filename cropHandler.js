@@ -125,7 +125,7 @@ function setupCropControls(unfilteredCanvas) {
     });
     uploadBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        triggerFileUpload(); // This will need to be passed or imported
+        triggerFileUpload();
     });
     uploadBtn.addEventListener('touchend', (e) => {
         e.preventDefault();
@@ -166,14 +166,17 @@ function setupCropControls(unfilteredCanvas) {
                 cropImage.src = tempCanvas.toDataURL('image/png');
                 cropImage.onload = () => drawCropOverlay();
                 if (cropImage.complete && cropImage.naturalWidth !== 0) cropImage.onload();
-            });
+            }).catch(err => console.error("Crop restore failed:", err));
     });
     confirmBtn.addEventListener('click', (e) => {
         e.preventDefault();
         closeModal(cropModal);
         let origWidth = cropImage.width;
         let origHeight = cropImage.height;
-        if (origWidth === 0 || origHeight === 0) return;
+        if (origWidth === 0 || origHeight === 0) {
+            console.error("Crop image dimensions are invalid");
+            return;
+        }
         const angleRad = rotation * Math.PI / 180;
         const cosA = Math.abs(Math.cos(angleRad));
         const sinA = Math.abs(Math.sin(angleRad));
@@ -206,6 +209,11 @@ function setupCropControls(unfilteredCanvas) {
             cropX, cropY, cropWidth, cropHeight,
             0, 0, cropWidth, cropHeight
         );
+        // Verify cropped data
+        const testData = tempCtx.getImageData(0, 0, cropWidth, cropHeight).data;
+        if (testData.every(val => val === 0)) {
+            console.warn("Cropped image data is empty");
+        }
         img.src = tempCanvas.toDataURL('image/png');
         originalUploadedImage.src = tempCanvas.toDataURL('image/png');
         originalWidth = tempCanvas.width;
@@ -220,11 +228,11 @@ function setupCropControls(unfilteredCanvas) {
         previewTempCtx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
         initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
         initialRotation = rotation;
-        const loadImage = new Promise((resolve) => {
+        const loadImage = new Promise((resolve, reject) => {
             if (img.complete && img.naturalWidth !== 0) resolve();
             else {
                 img.onload = resolve;
-                img.onerror = () => resolve();
+                img.onerror = () => reject(new Error("Image failed to load after cropping"));
             }
         });
         loadImage.then(() => {
@@ -257,16 +265,20 @@ function setupCropControls(unfilteredCanvas) {
             }
             canvas.width = Math.round(previewWidth);
             canvas.height = Math.round(previewHeight);
-            redrawImage(
+            return redrawImage(
                 ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                 isShowingOriginal, trueOriginalImage, modal, modalImage, true
-            )
-                .then(() => {
-                    originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                })
-                .finally(() => {
-                    closeModal(cropModal);
-                });
+            );
+        }).then(() => {
+            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+            saveImageState(); // Save the post-crop state
+        }).catch(err => {
+            console.error("Crop rendering failed:", err);
+            ctx.fillStyle = "red"; // Debug: Indicate failure
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }).finally(() => {
+            closeModal(cropModal);
+            showLoadingIndicator(false);
         });
     });
     confirmBtn.addEventListener('touchend', (e) => {
@@ -313,10 +325,10 @@ function setupCropControls(unfilteredCanvas) {
             redrawImage(
                 ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                 isShowingOriginal, trueOriginalImage, modal, modalImage, true
-            )
-                .then(() => {
-                    originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                });
+            ).then(() => {
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                saveImageState(); // Save state after skip
+            }).catch(err => console.error("Skip redraw failed:", err));
         };
         if (img.complete && img.naturalWidth !== 0) {
             proceedWithRedraw();

@@ -429,15 +429,16 @@ downloadButton.addEventListener('click', () => {
 
 let isRedrawing = false;
 function saveImageState(isOriginal = false) {
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const previewImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const fullResImageSrc = fullResCanvas.toDataURL('image/png'); // Store full-res state
     if (isOriginal) {
-        history = [{ filters: { ...settings }, imageData }];
+        history = [{ filters: { ...settings }, imageData: previewImageData, fullResSrc: fullResImageSrc }];
         redoHistory = [];
         lastAppliedEffect = null;
     } else {
         const lastState = history[history.length - 1];
-        if (JSON.stringify(lastState.filters) !== JSON.stringify(settings)) {
-            history.push({ filters: { ...settings }, imageData });
+        if (JSON.stringify(lastState.filters) !== JSON.stringify(settings) || lastState.fullResSrc !== fullResImageSrc) {
+            history.push({ filters: { ...settings }, imageData: previewImageData, fullResSrc: fullResImageSrc });
             if (history.length > 50) history.shift();
             redoHistory = [];
         }
@@ -455,7 +456,20 @@ function handleUndo(e) {
             input.value = settings[input.id];
         });
         updateControlIndicators();
-        redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, false);
+        // Restore full-res image
+        const tempImg = new Image();
+        tempImg.src = previousState.fullResSrc;
+        tempImg.onload = () => {
+            fullResCanvas.width = tempImg.width;
+            fullResCanvas.height = tempImg.height;
+            fullResCtx.drawImage(tempImg, 0, 0);
+            img.src = previousState.fullResSrc;
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, false
+            ).catch(err => console.error("Undo redraw failed:", err));
+        };
+        tempImg.onerror = () => console.error("Failed to load previous image state");
     }
 }
 
@@ -534,17 +548,32 @@ restoreButton.addEventListener('click', () => {
         input.value = settings[input.id];
     });
     updateControlIndicators();
+    // Reset to the true original image
+    img.src = trueOriginalImage.src;
+    originalWidth = trueOriginalImage.width;
+    originalHeight = trueOriginalImage.height;
     fullResCanvas.width = originalWidth;
     fullResCanvas.height = originalHeight;
-    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-    if (img.complete && img.naturalWidth !== 0) {
+    fullResCtx.drawImage(trueOriginalImage, 0, 0, originalWidth, originalHeight);
+    if (trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
         redrawImage(
             ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
         ).then(() => {
             originalFullResImage.src = fullResCanvas.toDataURL('image/png');
             ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-        });
+        }).catch(err => console.error("Restore redraw failed:", err));
+    } else {
+        img.onload = () => {
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+            ).then(() => {
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+            }).catch(err => console.error("Restore redraw failed after load:", err));
+        };
+        img.onerror = () => console.error("Failed to load trueOriginalImage for restore");
     }
 });
 
