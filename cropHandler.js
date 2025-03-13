@@ -18,12 +18,12 @@ let lockAspectRatio = false;
 let aspectRatio = 1;
 let settings, noiseSeed, isShowingOriginal; // To be set via initialize
 let originalWidth, originalHeight, previewWidth, previewHeight; // To be set via initialize
-let downloadButton; // Declare at top
+
 function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-       previewWidth, previewHeight, uploadNewPhotoButton,downloadButton } = options); // Add uploadNewPhotoButton
+       previewWidth, previewHeight, uploadNewPhotoButton } = options); // Add uploadNewPhotoButton
     setupModal(cropModal, false);
 }
 
