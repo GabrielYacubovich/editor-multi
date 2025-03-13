@@ -49,7 +49,7 @@ function applyBasicFiltersManually(ctx, canvas, settings) {
 }
 
 function redrawImage(
-    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, 
+    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
     isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false
 ) {
     showLoadingIndicator(true);
@@ -85,25 +85,22 @@ function redrawImage(
                 modalImage.src = canvas.toDataURL('image/png');
             }
             if (saveState) {
-                // Note: saveImageState is still in main.js; we'll need to modularize it later
-                // For now, we'll assume it's available globally or passed somehow
-                saveImageState();
+                saveImageState(); // Temporary: Assumes saveImageState is global
             }
             showLoadingIndicator(false);
         });
 }
 
-// Placeholder implementations (to be fully implemented later)
 function applyAdvancedFilters(ctx, canvas, noiseSeed, scaleFactor) {
-    return new Promise(resolve => resolve());
+    return new Promise(resolve => resolve()); // Placeholder
 }
 
 function applyGlitchEffects(ctx, canvas, noiseSeed, scaleFactor) {
-    return new Promise(resolve => resolve());
+    return new Promise(resolve => resolve()); // Placeholder
 }
 
 function applyComplexFilters(ctx, canvas, noiseSeed, scaleFactor) {
-    return new Promise(resolve => resolve());
+    return new Promise(resolve => resolve()); // Placeholder
 }
 
 export { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage };
