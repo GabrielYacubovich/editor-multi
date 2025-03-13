@@ -48,7 +48,7 @@ function applyBasicFiltersManually(ctx, canvas, settings) {
 }
 
 // Advanced Filters: Vibrance, Highlights, Shadows, Noise
-function applyAdvancedFilters(ctx, canvas, noiseSeed, scaleFactor) {
+function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
@@ -108,7 +108,7 @@ function applyAdvancedFilters(ctx, canvas, noiseSeed, scaleFactor) {
 }
 
 // Glitch Effects: Chromatic Aberration, RGB Split, Pixel Shuffle, Wave
-function applyGlitchEffects(ctx, canvas, noiseSeed, scaleFactor) {
+function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const width = canvas.width;
         const height = canvas.height;
@@ -223,7 +223,7 @@ function applyGlitchEffects(ctx, canvas, noiseSeed, scaleFactor) {
 }
 
 // Complex Filters: Kaleidoscope, Vortex Twist, Edge Detection
-function applyComplexFilters(ctx, canvas, noiseSeed, scaleFactor) {
+function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const width = canvas.width;
         const height = canvas.height;
@@ -332,9 +332,9 @@ function redrawImage(
     fullResCtx.drawImage(img, 0, 0, fullResCanvas.width, fullResCanvas.height);
     applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
     const scaleFactor = 1;
-    return applyAdvancedFilters(fullResCtx, fullResCanvas, noiseSeed, scaleFactor)
-        .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, noiseSeed, scaleFactor))
-        .then(() => applyComplexFilters(fullResCtx, fullResCanvas, noiseSeed, scaleFactor))
+    return applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor)
+        .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
+        .then(() => applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
         .then(() => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (isShowingOriginal && trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
