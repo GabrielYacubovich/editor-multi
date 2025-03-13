@@ -1141,16 +1141,16 @@ cropImageButton.addEventListener('touchend', (e) => {
     showCropModal();
 });
 restoreButton.addEventListener('click', () => {
-    settings = { 
-        brightness: 100, 
-        contrast: 100, 
-        grayscale: 0, 
-        vibrance: 100, 
-        highlights: 100, 
-        shadows: 100, 
-        noise: 0, 
-        exposure: 100, 
-        temperature: 100, 
+    settings = {
+        brightness: 100,
+        contrast: 100,
+        grayscale: 0,
+        vibrance: 100,
+        highlights: 100,
+        shadows: 100,
+        noise: 0,
+        exposure: 100,
+        temperature: 100,
         saturation: 100,
         'glitch-chromatic': 0,
         'glitch-rgb-split': 0,
@@ -1170,13 +1170,15 @@ restoreButton.addEventListener('click', () => {
     fullResCanvas.width = originalWidth;
     fullResCanvas.height = originalHeight;
     fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-    redrawImage(
-        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-    ).then(() => {
-        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-    });
+    if (img.complete && img.naturalWidth !== 0) {
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+        ).then(() => {
+            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+            ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+        });
+    }
 });
 if (img.complete && img.naturalWidth !== 0) {
     redrawImage(
@@ -1252,7 +1254,12 @@ redrawImage(true)
                     if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
                         lastAppliedEffect = id;
                     }
-                    redrawImage(true);
+                    if (img.complete && img.naturalWidth !== 0) {
+                        redrawImage(
+                            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                        );
+                    }
                 }
             }
         });
@@ -1266,7 +1273,12 @@ redrawImage(true)
                     if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
                         lastAppliedEffect = id;
                     }
-                    redrawImage(true);
+                    if (img.complete && img.naturalWidth !== 0) {
+                        redrawImage(
+                            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                        );
+                    }
                 }
             }
         });
@@ -1280,7 +1292,12 @@ redrawImage(true)
                     if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
                         lastAppliedEffect = id;
                     }
-                    redrawImage(true);
+                    if (img.complete && img.naturalWidth !== 0) {
+                        redrawImage(
+                            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                        );
+                    }
                 }
             }
         });
