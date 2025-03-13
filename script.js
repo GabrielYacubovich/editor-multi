@@ -71,6 +71,7 @@ function triggerFileUpload() {
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
+            console.log("trueOriginalImage set:", trueOriginalImage.src);
             originalUploadedImage.src = event.target.result;
             showCropModal(event.target.result);
             cleanupFileInput();
@@ -135,13 +136,19 @@ function updateControlIndicators() {
 }
 
 toggleOriginalButton.addEventListener('click', () => {
-    if (!originalImageData) return;
+    console.log("Toggle clicked, originalImageData:", !!originalImageData, "trueOriginalImage:", trueOriginalImage.complete);
+    if (!originalImageData || !trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image data is missing or invalid");
+        return;
+    }
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
         isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
-    );
+    ).catch(err => {
+        console.error("Toggle redraw failed:", err);
+    });
 });
 
 toggleOriginalButton.addEventListener('touchend', (e) => {
@@ -369,7 +376,21 @@ downloadButton.addEventListener('click', () => {
         const scale = parseFloat(resolutionSelect.value) / 100;
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
+    
+        if (!originalWidth || !originalHeight) {
+            console.error("Invalid dimensions for download:", originalWidth, originalHeight);
+            alert("Cannot download: Image dimensions are invalid.");
+            return;
+        }
+    
         showLoadingIndicator(true);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = Math.round(originalWidth * scale);
+        tempCanvas.height = Math.round(originalHeight * scale);
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.imageSmoothingEnabled = true;
+        tempCtx.imageSmoothingQuality = 'high';
+    
         if (!isEdited && scale === 1.0) {
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
@@ -380,12 +401,14 @@ downloadButton.addEventListener('click', () => {
             document.body.removeChild(overlay);
             return;
         }
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = Math.round(originalWidth * scale);
-        tempCanvas.height = Math.round(originalHeight * scale);
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.imageSmoothingEnabled = true;
-        tempCtx.imageSmoothingQuality = 'high';
+    
+        if (!img || !img.complete || img.naturalWidth === 0) {
+            console.error("Image not ready for download:", img);
+            showLoadingIndicator(false);
+            alert("Image is not loaded properly.");
+            return;
+        }
+    
         redrawImage(
             ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
@@ -393,6 +416,12 @@ downloadButton.addEventListener('click', () => {
             tempCtx.drawImage(fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
             const quality = fileType === 'image/png' ? undefined : 1.0;
             tempCanvas.toBlob((blob) => {
+                if (!blob || blob.size === 0) {
+                    console.error("Generated blob is empty");
+                    showLoadingIndicator(false);
+                    alert("Failed to generate downloadable image.");
+                    return;
+                }
                 const link = document.createElement('a');
                 link.download = `${sanitizedFileName}-${Math.round(scale * 100)}%.${extension}`;
                 link.href = URL.createObjectURL(blob);
@@ -405,6 +434,7 @@ downloadButton.addEventListener('click', () => {
         }).catch(error => {
             console.error("Download failed:", error);
             showLoadingIndicator(false);
+            alert("An error occurred while processing the image.");
             document.body.removeChild(popup);
             document.body.removeChild(overlay);
         });
