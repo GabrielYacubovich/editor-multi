@@ -980,11 +980,11 @@ downloadButton.addEventListener('click', () => {
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
         if (originalWidth && originalHeight) {
-        tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
-    } else {
-        tempCtx.fillStyle = '#000';
-      tempCtx.fillRect(0, 0, width, height);
-    }
+            tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
+        } else {
+            tempCtx.fillStyle = '#000';
+            tempCtx.fillRect(0, 0, width, height);
+        }
         const fileType = fileTypeSelect.value;
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
@@ -1000,7 +1000,10 @@ downloadButton.addEventListener('click', () => {
     resolutionSelect.addEventListener('change', updateFileInfo);
     fileTypeSelect.addEventListener('change', updateFileInfo);
 
+    // Define buttons *after* popup is added to DOM
     const saveConfirmBtn = document.getElementById('save-confirm');
+    const saveCancelBtn = document.getElementById('save-cancel');
+
     saveConfirmBtn.addEventListener('click', () => {
         const fileName = document.getElementById('save-file-name').value.trim() || 'nueva-imagen';
         const fileType = fileTypeSelect.value;
@@ -1008,7 +1011,6 @@ downloadButton.addEventListener('click', () => {
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
         showLoadingIndicator(true);
-
         if (!isEdited && scale === 1.0) {
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
@@ -1019,15 +1021,12 @@ downloadButton.addEventListener('click', () => {
             document.body.removeChild(overlay);
             return;
         }
-
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = Math.round(originalWidth * scale);
         tempCanvas.height = Math.round(originalHeight * scale);
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-
-        // Pass all required parameters to redrawImage
         redrawImage(
             ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
@@ -1051,15 +1050,12 @@ downloadButton.addEventListener('click', () => {
             document.body.removeChild(overlay);
         });
     });
-    saveConfirmBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        saveConfirmBtn.click();
-    });
 
     saveCancelBtn.addEventListener('click', () => {
         document.body.removeChild(popup);
         document.body.removeChild(overlay);
     });
+
     saveCancelBtn.addEventListener('touchend', (e) => {
         e.preventDefault();
         document.body.removeChild(popup);
