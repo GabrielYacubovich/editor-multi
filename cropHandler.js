@@ -18,7 +18,7 @@ let lockAspectRatio = false;
 let aspectRatio = 1;
 let settings, noiseSeed, isShowingOriginal; // To be set via initialize
 let originalWidth, originalHeight, previewWidth, previewHeight; // To be set via initialize
-
+let downloadButton; // Declare at top
 function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
@@ -364,6 +364,7 @@ function setupCropControls(unfilteredCanvas) {
             )
                 .then(() => {
                     originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                    downloadButton.disabled = false; // Enable download button
                 });
         };
         if (img.complete && img.naturalWidth !== 0) {
