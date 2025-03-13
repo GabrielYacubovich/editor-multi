@@ -204,24 +204,17 @@ toggleOriginalButton.addEventListener('click', () => {
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, true
-    )
-        .then(() => {
-            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-        })
-        .finally(() => {
-            closeModal(cropModal);
-            uploadNewPhotoButton.style.display = 'block';
-        });
-});
-toggleOriginalButton.addEventListener('touchend', (e) => {
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false
+    );
+});toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (!originalImageData) {
-        return;
-    }
+    if (!originalImageData) return;
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    redrawImage(false);
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false
+    );
 });
 function setupCropControls(unfilteredCanvas) {
     const cropControls = document.getElementById('crop-controls');
@@ -409,7 +402,10 @@ function setupCropControls(unfilteredCanvas) {
             }
             canvas.width = Math.round(previewWidth);
             canvas.height = Math.round(previewHeight);
-            redrawImage(true)
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, true
+            )
                 .then(() => {
                     originalFullResImage.src = fullResCanvas.toDataURL('image/png');
                 })
