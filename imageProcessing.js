@@ -1,5 +1,6 @@
 import { showLoadingIndicator } from './domUtils.js';
 
+// Basic Filters (unchanged, matches old behavior)
 function applyBasicFiltersManually(ctx, canvas, settings) {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
@@ -47,59 +48,47 @@ function applyBasicFiltersManually(ctx, canvas, settings) {
     ctx.putImageData(imageData, 0, 0);
 }
 
-// Advanced Filters: Vibrance, Highlights, Shadows, Noise
+// Advanced Filters (aligned with old Web Worker logic)
 function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         const vibrance = (settings.vibrance - 100) / 100; // -1 to 1
-        const highlights = (settings.highlights - 100) / 100; // -1 to 1
-        const shadows = (settings.shadows - 100) / 100; // -1 to 1
-        const noise = settings.noise / 100; // 0 to 1
+        const highlights = settings.highlights / 100; // 0 to 2
+        const shadows = settings.shadows / 100; // 0 to 2
+        const noise = settings.noise; // 0 to 100
 
         for (let i = 0; i < data.length; i += 4) {
             let r = data[i];
             let g = data[i + 1];
             let b = data[i + 2];
+            const avg = (r + g + b) / 3;
 
-            // Vibrance: Boosts less-saturated colors
-            if (vibrance !== 0) {
-                const avg = (r + g + b) / 3;
-                const max = Math.max(r, g, b);
-                const amt = ((max - avg) * vibrance) / 255;
-                r += (max - r) * amt;
-                g += (max - g) * amt;
-                b += (max - b) * amt;
-            }
+            // Vibrance
+            data[i] += (r - avg) * vibrance;
+            data[i + 1] += (g - avg) * vibrance;
+            data[i + 2] += (b - avg) * vibrance;
 
-            // Highlights and Shadows: Adjust based on luminance
-            const luminance = 0.2989 * r + 0.5870 * g + 0.1140 * b;
-            if (highlights !== 0 && luminance > 128) {
-                const factor = 1 + highlights * 0.5;
-                r *= factor;
-                g *= factor;
-                b *= factor;
-            }
-            if (shadows !== 0 && luminance <= 128) {
-                const factor = 1 + shadows * 0.5;
-                r *= factor;
-                g *= factor;
-                b *= factor;
-            }
+            // Highlights and Shadows
+            if (r > 128) data[i] *= highlights;
+            else data[i] *= shadows;
+            if (g > 128) data[i + 1] *= highlights;
+            else data[i + 1] *= shadows;
+            if (b > 128) data[i + 2] *= highlights;
+            else data[i + 2] *= shadows;
 
-            // Noise: Add seeded random noise
+            // Noise
             if (noise > 0) {
-                const seed = noiseSeed + i / 4;
-                const rand = Math.sin(seed) * 43758.5453;
-                const noiseValue = (rand - Math.floor(rand) - 0.5) * noise * 50 * scaleFactor;
-                r += noiseValue;
-                g += noiseValue;
-                b += noiseValue;
+                const randomValue = Math.sin(noiseSeed + i * 12.9898) * 43758.5453;
+                const noiseAmount = (randomValue - Math.floor(randomValue) - 0.5) * noise * scaleFactor;
+                data[i] += noiseAmount;
+                data[i + 1] += noiseAmount;
+                data[i + 2] += noiseAmount;
             }
 
-            data[i] = Math.max(0, Math.min(255, r));
-            data[i + 1] = Math.max(0, Math.min(255, g));
-            data[i + 2] = Math.max(0, Math.min(255, b));
+            data[i] = Math.max(0, Math.min(255, data[i]));
+            data[i + 1] = Math.max(0, Math.min(255, data[i + 1]));
+            data[i + 2] = Math.max(0, Math.min(255, data[i + 2]));
         }
 
         ctx.putImageData(imageData, 0, 0);
@@ -107,211 +96,264 @@ function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     });
 }
 
-// Glitch Effects: Chromatic Aberration, RGB Split, Pixel Shuffle, Wave
+// Glitch Effects (aligned with old pixel-based logic)
 function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const width = canvas.width;
         const height = canvas.height;
         const imageData = ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
+        let data = imageData.data;
+        const previewMinDimension = Math.min(width, height);
+        let randomSeed = noiseSeed;
 
-        const chromatic = settings['glitch-chromatic'] / 100 * scaleFactor; // 0 to 1
-        const rgbSplit = settings['glitch-rgb-split'] / 100 * scaleFactor; // 0 to 1
-        const verticalChromatic = settings['glitch-chromatic-vertical'] / 100 * scaleFactor;
-        const diagonalChromatic = settings['glitch-chromatic-diagonal'] / 100 * scaleFactor;
-        const pixelShuffle = settings['glitch-pixel-shuffle'] / 100 * scaleFactor; // 0 to 1
-        const wave = settings['glitch-wave'] / 100 * scaleFactor; // 0 to 1
+        // Helper for seeded random
+        function seededRandom() {
+            let x = Math.sin(randomSeed++) * 10000;
+            return x - Math.floor(x);
+        }
 
-        // Create temporary canvases for channel shifts
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = width;
-        tempCanvas.height = height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.putImageData(imageData, 0, 0);
-
-        if (chromatic > 0 || rgbSplit > 0 || verticalChromatic > 0 || diagonalChromatic > 0) {
-            const rCanvas = document.createElement('canvas');
-            const gCanvas = document.createElement('canvas');
-            const bCanvas = document.createElement('canvas');
-            rCanvas.width = gCanvas.width = bCanvas.width = width;
-            rCanvas.height = gCanvas.height = bCanvas.height = height;
-            const rCtx = rCanvas.getContext('2d');
-            const gCtx = gCanvas.getContext('2d');
-            const bCtx = bCanvas.getContext('2d');
-
-            // Horizontal Chromatic Aberration
-            if (chromatic > 0) {
-                rCtx.drawImage(tempCanvas, chromatic * 10, 0);
-                gCtx.drawImage(tempCanvas, 0, 0);
-                bCtx.drawImage(tempCanvas, -chromatic * 10, 0);
-            } else {
-                rCtx.drawImage(tempCanvas, 0, 0);
-                gCtx.drawImage(tempCanvas, 0, 0);
-                bCtx.drawImage(tempCanvas, 0, 0);
+        // Chromatic Aberration (Horizontal)
+        if (settings['glitch-chromatic'] > 0) {
+            const intensity = settings['glitch-chromatic'] / 100;
+            const maxShift = Math.min(50 * intensity * (width / previewMinDimension), Math.min(width, height) / 8);
+            const tempData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    const rShiftX = Math.max(0, x - Math.round(maxShift));
+                    const gShiftX = Math.max(0, x - Math.round(maxShift * 0.5));
+                    const bShiftX = Math.min(width - 1, x + Math.round(maxShift));
+                    const rIdx = (y * width + rShiftX) * 4;
+                    const gIdx = (y * width + gShiftX) * 4;
+                    const bIdx = (y * width + bShiftX) * 4;
+                    data[idx] = tempData[rIdx];
+                    data[idx + 1] = tempData[gIdx + 1];
+                    data[idx + 2] = tempData[bIdx + 2];
+                    data[idx + 3] = tempData[idx + 3];
+                }
             }
+        }
 
-            // RGB Split
-            if (rgbSplit > 0) {
-                rCtx.translate(rgbSplit * 15, rgbSplit * 15);
-                bCtx.translate(-rgbSplit * 15, -rgbSplit * 15);
+        // RGB Split
+        if (settings['glitch-rgb-split'] > 0) {
+            const intensity = settings['glitch-rgb-split'] / 100;
+            const maxShift = Math.min(30 * intensity * (Math.max(width, height) / previewMinDimension), Math.max(width, height) / 8);
+            const tempData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    randomSeed += 1;
+                    const rShift = Math.floor(seededRandom() * maxShift - maxShift / 2);
+                    randomSeed += 1;
+                    const gShift = Math.floor(seededRandom() * maxShift - maxShift / 2);
+                    randomSeed += 1;
+                    const bShift = Math.floor(seededRandom() * maxShift - maxShift / 2);
+                    const rX = clamp(x + rShift, 0, width - 1);
+                    const gX = clamp(x + gShift, 0, width - 1);
+                    const bX = clamp(x + bShift, 0, width - 1);
+                    data[idx] = tempData[(y * width + rX) * 4];
+                    data[idx + 1] = tempData[(y * width + gX) * 4 + 1];
+                    data[idx + 2] = tempData[(y * width + bX) * 4 + 2];
+                }
             }
+        }
 
-            // Vertical Chromatic Aberration
-            if (verticalChromatic > 0) {
-                rCtx.translate(0, verticalChromatic * 10);
-                bCtx.translate(0, -verticalChromatic * 10);
+        // Chromatic Aberration (Vertical)
+        if (settings['glitch-chromatic-vertical'] > 0) {
+            const intensity = settings['glitch-chromatic-vertical'] / 100;
+            const maxShift = Math.min(50 * intensity * (height / previewMinDimension), Math.min(width, height) / 8);
+            const tempData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    const rShiftY = Math.max(0, y - Math.round(maxShift));
+                    const gShiftY = Math.max(0, y - Math.round(maxShift * 0.5));
+                    const bShiftY = Math.min(height - 1, y + Math.round(maxShift));
+                    const rIdx = (rShiftY * width + x) * 4;
+                    const gIdx = (gShiftY * width + x) * 4;
+                    const bIdx = (bShiftY * width + x) * 4;
+                    data[idx] = tempData[rIdx];
+                    data[idx + 1] = tempData[gIdx + 1];
+                    data[idx + 2] = tempData[bIdx + 2];
+                    data[idx + 3] = tempData[idx + 3];
+                }
             }
+        }
 
-            // Diagonal Chromatic Aberration
-            if (diagonalChromatic > 0) {
-                rCtx.translate(diagonalChromatic * 10, diagonalChromatic * 10);
-                bCtx.translate(-diagonalChromatic * 10, -diagonalChromatic * 10);
+        // Chromatic Aberration (Diagonal)
+        if (settings['glitch-chromatic-diagonal'] > 0) {
+            const intensity = settings['glitch-chromatic-diagonal'] / 100;
+            const maxShift = Math.min(50 * intensity * (Math.max(width, height) / previewMinDimension), Math.max(width, height) / 8);
+            const tempData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = (y * width + x) * 4;
+                    const rShiftX = Math.max(0, x - Math.round(maxShift));
+                    const rShiftY = Math.max(0, y - Math.round(maxShift));
+                    const gShiftX = x;
+                    const gShiftY = y;
+                    const bShiftX = Math.min(width - 1, x + Math.round(maxShift));
+                    const bShiftY = Math.min(height - 1, y + Math.round(maxShift));
+                    const rIdx = (rShiftY * width + rShiftX) * 4;
+                    const gIdx = (gShiftY * width + gShiftX) * 4;
+                    const bIdx = (bShiftY * width + bShiftX) * 4;
+                    data[idx] = tempData[rIdx];
+                    data[idx + 1] = tempData[gIdx + 1];
+                    data[idx + 2] = tempData[bIdx + 2];
+                    data[idx + 3] = tempData[idx + 3];
+                }
             }
-
-            ctx.clearRect(0, 0, width, height);
-            ctx.drawImage(rCanvas, 0, 0);
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.drawImage(gCanvas, 0, 0);
-            ctx.drawImage(bCanvas, 0, 0);
-            ctx.globalCompositeOperation = 'source-over';
         }
 
         // Pixel Shuffle
-        if (pixelShuffle > 0) {
-            const shuffledData = ctx.getImageData(0, 0, width, height);
-            const shuffled = shuffledData.data;
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4;
-                    const seed = noiseSeed + x + y * width;
-                    const rand = Math.sin(seed) * 43758.5453;
-                    const offset = Math.floor((rand - Math.floor(rand)) * pixelShuffle * 10);
-                    const newX = clamp(x + offset, 0, width - 1);
-                    const newY = clamp(y + offset, 0, height - 1);
-                    const newI = (newY * width + newX) * 4;
-                    shuffled[newI] = data[i];
-                    shuffled[newI + 1] = data[i + 1];
-                    shuffled[newI + 2] = data[i + 2];
-                    shuffled[newI + 3] = data[i + 3];
+        if (settings['glitch-pixel-shuffle'] > 0) {
+            const intensity = settings['glitch-pixel-shuffle'] / 100;
+            const blockSize = Math.floor(5 * scaleFactor);
+            for (let y = 0; y < height - blockSize; y += blockSize) {
+                for (let x = 0; x < width - blockSize; x += blockSize) {
+                    randomSeed += 1;
+                    if (seededRandom() < 0.3 * intensity) {
+                        randomSeed += 1;
+                        const destX = clamp(x + Math.floor((seededRandom() - 0.5) * 50 * intensity * scaleFactor), 0, width - blockSize);
+                        randomSeed += 1;
+                        const destY = clamp(y + Math.floor((seededRandom() - 0.5) * 50 * intensity * scaleFactor), 0, height - blockSize);
+                        for (let dy = 0; dy < blockSize; dy++) {
+                            for (let dx = 0; dx < blockSize; dx++) {
+                                const srcIdx = ((y + dy) * width + (x + dx)) * 4;
+                                const destIdx = ((destY + dy) * width + (destX + dx)) * 4;
+                                [data[srcIdx], data[destIdx]] = [data[destIdx], data[srcIdx]];
+                                [data[srcIdx + 1], data[destIdx + 1]] = [data[destIdx + 1], data[srcIdx + 1]];
+                                [data[srcIdx + 2], data[destIdx + 2]] = [data[destIdx + 2], data[srcIdx + 2]];
+                                [data[srcIdx + 3], data[destIdx + 3]] = [data[destIdx + 3], data[srcIdx + 3]];
+                            }
+                        }
+                    }
                 }
             }
-            ctx.putImageData(shuffledData, 0, 0);
         }
 
         // Wave Distortion
-        if (wave > 0) {
-            const wavedData = ctx.getImageData(0, 0, width, height);
-            const waved = wavedData.data;
+        if (settings['glitch-pixel-shuffle'] > 0) {
+            const intensity = settings['glitch-wave'] / 100;
+            const tempData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+            const amplitude = 20 * intensity * scaleFactor;
+            const frequency = 0.05 / scaleFactor;
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4;
-                    const seed = noiseSeed + y;
-                    const rand = Math.sin(seed + x * 0.1) * wave * 20;
-                    const newX = clamp(x + Math.floor(rand), 0, width - 1);
-                    const newI = (y * width + newX) * 4;
-                    waved[i] = data[newI];
-                    waved[i + 1] = data[newI + 1];
-                    waved[i + 2] = data[newI + 2];
-                    waved[i + 3] = data[newI + 3];
+                    const idx = (y * width + x) * 4;
+                    const waveShift = Math.floor(amplitude * Math.sin(frequency * y * randomSeed));
+                    const newX = clamp(x + waveShift, 0, width - 1);
+                    const srcIdx = (y * width + newX) * 4;
+                    data[idx] = tempData[srcIdx];
+                    data[idx + 1] = tempData[srcIdx + 1];
+                    data[idx + 2] = tempData[srcIdx + 2];
+                    data[idx + 3] = tempData[srcIdx + 3];
                 }
             }
-            ctx.putImageData(wavedData, 0, 0);
         }
 
+        ctx.putImageData(imageData, 0, 0);
         resolve();
     });
 }
 
-// Complex Filters: Kaleidoscope, Vortex Twist, Edge Detection
+// Complex Filters (aligned with old logic)
 function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const width = canvas.width;
         const height = canvas.height;
         const imageData = ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
+        let data = imageData.data;
+        let randomSeed = noiseSeed;
 
-        const segments = settings['kaleidoscope-segments']; // 0 to 100 (treat as count)
-        const offset = settings['kaleidoscope-offset'] / 100 * scaleFactor; // 0 to 1
-        const vortex = settings['vortex-twist'] / 100 * scaleFactor; // 0 to 1
-        const edgeDetect = settings['edge-detect'] / 100; // 0 to 1
-
-        // Kaleidoscope Effect
-        if (segments > 0) {
+        // Kaleidoscope
+        if (settings['kaleidoscope-segments'] > 0) {
+            const segments = Math.max(1, settings['kaleidoscope-segments']);
+            const offset = (settings['kaleidoscope-offset'] / 100) * Math.min(width, height) / 2;
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = width;
             tempCanvas.height = height;
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.putImageData(imageData, 0, 0);
-
             ctx.clearRect(0, 0, width, height);
-            const centerX = width / 2;
-            const centerY = height / 2;
+            const centerX = width / 2 + offset;
+            const centerY = height / 2 + offset;
             const angleStep = (2 * Math.PI) / segments;
-
             for (let i = 0; i < segments; i++) {
                 ctx.save();
                 ctx.translate(centerX, centerY);
-                ctx.rotate(angleStep * i + offset * Math.PI);
-                ctx.scale(i % 2 === 0 ? 1 : -1, 1); // Mirror every other segment
+                ctx.rotate(angleStep * i);
+                ctx.scale(i % 2 === 0 ? 1 : -1, 1);
                 ctx.drawImage(tempCanvas, -centerX, -centerY);
                 ctx.restore();
             }
+            imageData = ctx.getImageData(0, 0, width, height); // Update data after canvas ops
+            data = imageData.data;
         }
 
         // Vortex Twist
-        if (vortex > 0) {
-            const twistedData = ctx.getImageData(0, 0, width, height);
-            const twisted = twistedData.data;
+        if (settings['vortex-twist'] > 0) {
+            const intensity = settings['vortex-twist'] / 100;
+            const tempData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) tempData[i] = data[i];
             const centerX = width / 2;
             const centerY = height / 2;
-            const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
-
+            const maxRadius = Math.sqrt(centerX * centerX + centerY * centerY);
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4;
+                    const idx = (y * width + x) * 4;
                     const dx = x - centerX;
                     const dy = y - centerY;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const angle = Math.atan2(dy, dx) + (dist / maxDist) * vortex * Math.PI * 2;
-                    const newX = clamp(centerX + dist * Math.cos(angle), 0, width - 1);
-                    const newY = clamp(centerY + dist * Math.sin(angle), 0, height - 1);
-                    const newI = (Math.floor(newY) * width + Math.floor(newX)) * 4;
-                    twisted[i] = data[newI];
-                    twisted[i + 1] = data[newI + 1];
-                    twisted[i + 2] = data[newI + 2];
-                    twisted[i + 3] = data[newI + 3];
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx) + (distance / maxRadius) * intensity * Math.PI;
+                    const newX = Math.round(centerX + distance * Math.cos(angle));
+                    const newY = Math.round(centerY + distance * Math.sin(angle));
+                    const srcIdx = (clamp(newY, 0, height - 1) * width + clamp(newX, 0, width - 1)) * 4;
+                    data[idx] = tempData[srcIdx];
+                    data[idx + 1] = tempData[srcIdx + 1];
+                    data[idx + 2] = tempData[srcIdx + 2];
+                    data[idx + 3] = tempData[srcIdx + 3];
                 }
             }
-            ctx.putImageData(twistedData, 0, 0);
         }
 
-        // Edge Detection (Sobel Operator)
-        if (edgeDetect > 0) {
-            const edgeData = ctx.getImageData(0, 0, width, height);
-            const edge = edgeData.data;
-            const temp = new Uint8ClampedArray(data);
-
+        // Edge Detection
+        if (settings['edge-detect'] > 0) {
+            const intensity = settings['edge-detect'] / 100;
+            const tempData = new Uint8ClampedArray(data.length);
+            for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+            const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+            const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
             for (let y = 1; y < height - 1; y++) {
                 for (let x = 1; x < width - 1; x++) {
-                    const i = (y * width + x) * 4;
-                    const gx = (-temp[(y - 1) * width * 4 + (x - 1) * 4] + temp[(y - 1) * width * 4 + (x + 1) * 4]) +
-                               (-2 * temp[y * width * 4 + (x - 1) * 4] + 2 * temp[y * width * 4 + (x + 1) * 4]) +
-                               (-temp[(y + 1) * width * 4 + (x - 1) * 4] + temp[(y + 1) * width * 4 + (x + 1) * 4]);
-                    const gy = (-temp[(y - 1) * width * 4 + (x - 1) * 4] - 2 * temp[(y - 1) * width * 4 + x * 4] - temp[(y - 1) * width * 4 + (x + 1) * 4]) +
-                               (temp[(y + 1) * width * 4 + (x - 1) * 4] + 2 * temp[(y + 1) * width * 4 + x * 4] + temp[(y + 1) * width * 4 + (x + 1) * 4]);
-                    const magnitude = Math.sqrt(gx * gx + gy * gy) * edgeDetect;
-                    const value = Math.min(magnitude, 255);
-                    edge[i] = edge[i + 1] = edge[i + 2] = value;
-                    edge[i + 3] = 255;
+                    const idx = (y * width + x) * 4;
+                    let gx = 0, gy = 0;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const pixelIdx = ((y + dy) * width + (x + dx)) * 4;
+                            const gray = (tempData[pixelIdx] + tempData[pixelIdx + 1] + tempData[pixelIdx + 2]) / 3;
+                            gx += gray * sobelX[dy + 1][dx + 1];
+                            gy += gray * sobelY[dy + 1][dx + 1];
+                        }
+                    }
+                    const edge = Math.sqrt(gx * gx + gy * gy) * intensity;
+                    const value = Math.min(255, Math.max(0, edge));
+                    data[idx] = data[idx + 1] = data[idx + 2] = value;
                 }
             }
-            ctx.putImageData(edgeData, 0, 0);
         }
 
+        ctx.putImageData(imageData, 0, 0);
         resolve();
     });
 }
 
+// Redraw Image (unchanged, works with updated filters)
 function redrawImage(
     ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
     isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
@@ -360,7 +402,7 @@ function redrawImage(
         });
 }
 
-// Utility function for clamping values
+// Utility function
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
