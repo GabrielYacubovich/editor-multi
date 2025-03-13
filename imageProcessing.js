@@ -51,7 +51,7 @@ function applyBasicFiltersManually(ctx, canvas, settings) {
 // Advanced Filters (aligned with old Web Worker logic)
 function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         const vibrance = (settings.vibrance - 100) / 100; // -1 to 1
         const highlights = settings.highlights / 100; // 0 to 2
@@ -101,7 +101,7 @@ function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const width = canvas.width;
         const height = canvas.height;
-        const imageData = ctx.getImageData(0, 0, width, height);
+        let imageData = ctx.getImageData(0, 0, width, height);
         let data = imageData.data;
         const previewMinDimension = Math.min(width, height);
         let randomSeed = noiseSeed;
@@ -267,7 +267,7 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve) => {
         const width = canvas.width;
         const height = canvas.height;
-        const imageData = ctx.getImageData(0, 0, width, height);
+        let imageData = ctx.getImageData(0, 0, width, height);
         let data = imageData.data;
         let randomSeed = noiseSeed;
 
