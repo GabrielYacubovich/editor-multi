@@ -1,3 +1,4 @@
+let uploadNewPhotoButton; // Add this at the top of cropHandler.js
 // cropHandler.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
@@ -19,7 +20,10 @@ let settings, noiseSeed, isShowingOriginal; // To be set via initialize
 let originalWidth, originalHeight, previewWidth, previewHeight; // To be set via initialize
 
 function initializeCropHandler(options) {
-    ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, previewWidth, previewHeight } = options);
+    ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
+       trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
+       settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
+       previewWidth, previewHeight, uploadNewPhotoButton } = options); // Add uploadNewPhotoButton
     setupModal(cropModal, false);
 }
 

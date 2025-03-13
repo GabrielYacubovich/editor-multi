@@ -71,7 +71,6 @@ function triggerFileUpload() {
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            console.log("trueOriginalImage set:", trueOriginalImage.src);
             originalUploadedImage.src = event.target.result;
             showCropModal(event.target.result);
             cleanupFileInput();
@@ -102,7 +101,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModal(cropModal, false);
     setupModal(previewModal, true);
     initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, previewWidth, previewHeight
+        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
+        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
+        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
+        previewWidth, previewHeight, uploadNewPhotoButton // Add this
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
@@ -136,19 +138,13 @@ function updateControlIndicators() {
 }
 
 toggleOriginalButton.addEventListener('click', () => {
-    console.log("Toggle clicked, originalImageData:", !!originalImageData, "trueOriginalImage:", trueOriginalImage.complete);
-    if (!originalImageData || !trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
-        console.error("Cannot toggle: Original image data is missing or invalid");
-        return;
-    }
+    if (!originalImageData) return;
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
         isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
-    ).catch(err => {
-        console.error("Toggle redraw failed:", err);
-    });
+    );
 });
 
 toggleOriginalButton.addEventListener('touchend', (e) => {
@@ -377,6 +373,8 @@ downloadButton.addEventListener('click', () => {
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
     
+        console.log("saveConfirmBtn clicked - Settings:", { fileName, fileType, scale });
+    
         if (!originalWidth || !originalHeight) {
             console.error("Invalid dimensions for download:", originalWidth, originalHeight);
             alert("Cannot download: Image dimensions are invalid.");
@@ -391,7 +389,10 @@ downloadButton.addEventListener('click', () => {
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
     
+        console.log("Temp canvas created:", { width: tempCanvas.width, height: tempCanvas.height });
+    
         if (!isEdited && scale === 1.0) {
+            console.log("Downloading unedited image at original resolution");
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
             link.href = originalDataURL;
@@ -402,6 +403,7 @@ downloadButton.addEventListener('click', () => {
             return;
         }
     
+        console.log("saveConfirmBtn - img state:", { src: img.src, complete: img.complete, naturalWidth: img.naturalWidth });
         if (!img || !img.complete || img.naturalWidth === 0) {
             console.error("Image not ready for download:", img);
             showLoadingIndicator(false);
@@ -413,9 +415,11 @@ downloadButton.addEventListener('click', () => {
             ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
         ).then(() => {
+            console.log("redrawImage succeeded, drawing to tempCanvas");
             tempCtx.drawImage(fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
             const quality = fileType === 'image/png' ? undefined : 1.0;
             tempCanvas.toBlob((blob) => {
+                console.log("Blob generated:", { size: blob ? blob.size : "null", type: blob ? blob.type : "null" });
                 if (!blob || blob.size === 0) {
                     console.error("Generated blob is empty");
                     showLoadingIndicator(false);
