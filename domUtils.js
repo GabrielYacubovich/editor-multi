@@ -1,11 +1,11 @@
+// domUtils.js
 function closeModal(modalElement) {
     modalElement.style.display = 'none';
-    if (modalElement === cropModal) {
-        isDragging = false; // Assumes global `isDragging`
-        cropCanvas.style.cursor = 'default';
-        uploadNewPhotoButton.style.display = 'block';
+    if (modalElement.id === 'crop-modal') {
+        // Crop-specific logic to be moved to cropHandler.js later
+        document.getElementById('upload-new-photo').style.display = 'block';
     }
-    if (modalElement === modal) {
+    if (modalElement.id === 'image-modal') {
         document.getElementById('modal-controls').innerHTML = '';
     }
 }
@@ -32,6 +32,7 @@ function outsideClickHandler(e) {
         closeModal(this);
     }
 }
+
 function showLoadingIndicator(show = true) {
     const loading = document.getElementById('loading-indicator');
     if (!loading) {
@@ -50,10 +51,12 @@ function showLoadingIndicator(show = true) {
         document.body.appendChild(div);
     }
     loading.style.display = show ? 'block' : 'none';
-    if (show && canvas) {
+    if (show && document.getElementById('canvas')) {
+        const canvas = document.getElementById('canvas');
         const canvasRect = canvas.getBoundingClientRect();
         loading.style.left = `${canvasRect.left + canvasRect.width / 2}px`;
         loading.style.top = `${canvasRect.bottom + 10}px`;
     }
 }
+
 export { closeModal, setupModal, closeModalHandler, outsideClickHandler, showLoadingIndicator };
