@@ -1,133 +1,149 @@
-/* Container for the entire layout */
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    overflow-x: hidden;
+    height: 100vh;
+}
+
+/* Editor Container */
 .editor {
     display: flex;
     justify-content: center;
     align-items: flex-start;
     height: 100vh;
-    padding: 10px; /* Added padding for better edge spacing */
+    padding: 10px;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
-/* Container for image and controls */
+/* Content Container */
 #content {
     display: flex;
     justify-content: space-between;
     width: 100%;
     max-width: 1200px;
-    gap: 20px; /* Controlled gap between image and controls */
+    gap: 20px;
 }
 
-/* Image container */
+/* Image Container */
 #image-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 70%; /* Reduced from 80% */
-    padding-right: 20px; /* Reduced from 50px */
+    width: 100%;
+    padding-right: 20px;
 }
 
-/* Canvas styling */
 #canvas {
     image-rendering: auto;
-    max-width: 1920px;
+    max-width: 100%;
+    max-height: 800px;
+    padding-top:60px;
     width: 100%;
     height: auto;
     margin: 0 auto;
     cursor: pointer;
     display: block;
+    object-fit: contain;
+    z-index: 1;
 }
 
-/* Controls container */
+/* Controls Container */
 #controls-container {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: flex-start;
-    width: 30%; /* Adjusted from 40% */
-    min-width: 250px; /* Ensures controls don’t collapse too much */
+    width: 30%;
+    min-width: 250px;
 }
 
-/* Controls (sliders and labels) */
+#sliders-wrapper {
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Button Bar */
+#button-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+#button-bar button {
+    padding: 4px 12px;
+    background-color: #000;
+    color: white;
+    border: none;
+    border-radius: 19px;
+    cursor: pointer;
+    width: 100%;
+    max-width: 100px;
+    max-height: 20px;
+    min-height: 35px;
+    font-size: 12px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#button-bar button:hover {
+    background-color: #3a3a3a;
+}
+
+#button-bar button:active {
+    background-color: #555;
+}
+
+/* Controls (Sliders) */
 .controls {
     display: flex;
     flex-direction: column;
     width: 100%;
-    padding: 10px; /* Added padding */
+    padding: 0 10px 10px 0;
 }
 
-/* Each control (slider + label + value) */
 .controls div {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 5px; /* Reduced from 8px */
+    justify-content: center;
+    margin-bottom: 5px;
     width: 100%;
 }
 
 .controls label {
-    flex: 0 0 90px; /* Reduced from 100px */
-    margin-right: 5px; /* Reduced from 10px */
-    font-size: 13px; /* Slightly smaller */
+    flex: 0 0 90px;
+    margin-right: 5px;
+    font-size: 13px;
 }
 
 .controls input[type="range"] {
     flex: 1;
-    max-width: 140px; /* Reduced from 150px */
-    margin: 0 5px; /* Reduced from 10px */
+    max-width: 190px;
+    margin: 0 5px;
+    touch-action: pan-y;
 }
 
 .controls span {
-    flex: 0 0 35px; /* Reduced from 40px */
-    font-size: 13px; /* Smaller font */
+    flex: 0 0 35px;
+    font-size: 13px;
     font-weight: bold;
     text-align: right;
 }
 
-/* Complex Filters Header */
 .controls h3 {
-    margin: 15px 0 5px; /* Reduced from 20px 0 10px */
-    font-size: 15px; /* Reduced from 16px */
+    margin: 15px 0 5px;
+    font-size: 15px;
     font-weight: bold;
     color: #333;
-}
-
-/* Action buttons */
-.action-buttons {
-    margin-top: 10px; /* Reduced from 20px */
-    display: flex;
-    gap: 5px; /* Reduced from 10px */
-    flex-wrap: wrap;
-}
-
-.action-buttons button,
-#upload-new-photo,
-#toggle-original {
-    padding: 8px 15px; /* Reduced from 10px 20px */
-    background-color: #000;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    width: 100%;
-    max-width: 100px; /* Reduced from 120px */
-    min-height: 40px; /* Reduced from 44px */
-    box-sizing: border-box;
-    font-size: 13px; /* Reduced from 14px */
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-user-select: none;
-    user-select: none;
-}
-
-.action-buttons button:hover,
-#upload-new-photo:hover,
-#toggle-original:hover {
-    background-color: #3a3a3a;
-}
-
-.action-buttons button:active,
-#upload-new-photo:active,
-#toggle-original:active {
-    background-color: #555;
 }
 
 /* Modal Styles */
@@ -146,20 +162,19 @@
     position: relative;
     margin: 2% auto;
     width: 95%;
+    min-height: 550px;
     max-width: 1200px;
-    padding: 15px; /* Reduced from 20px */
+    padding: 15px;
     background-color: #fff;
-    box-sizing: border-box;
-    border-radius: 8px; /* Reduced from 10px */
+    border-radius: 8px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     max-height: 90vh;
     overflow-y: auto;
 }
 
 .modal-close-btn {
-    position: absolute;
-    top: 10px;
-    right: 20px;
+    position: fixed;
+    padding-left:1150px;
     font-size: 30px;
     color: #333;
     cursor: pointer;
@@ -169,31 +184,38 @@
     color: #ff0000;
 }
 
-/* Image Modal Specific */
+/* Image Modal */
 #image-modal .modal-inner {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 15px; /* Reduced from 20px */
+    gap: 15px;
 }
 
 #modal-image {
     max-width: 70%;
     width: 100%;
+    margin-left: 290px;
+    padding-top:67px;
+    padding-bottom: 40px;
+    padding-left: 25px;
     height: auto;
     object-fit: contain;
 }
 
 #modal-controls {
-    width: 30%;
-    max-height: 90vh;
-    overflow-y: auto;
+    position: fixed;
+    width: 290px; /* Fixed width for sliders */
+    max-height: calc(100vh - 40px); /* Ensure it fits within viewport */
+    overflow-y: auto; /* Allow scrolling within controls if too many sliders */
+    background: rgb(255, 255, 255); /* Semi-transparent background */
     padding: 10px;
-    box-sizing: border-box;
+    border-radius: 5px;
+    z-index: 1001; /* Above the image */
 }
 
-/* Crop Modal Specific */
+/* Crop Modal */
 #crop-canvas {
     max-width: 100%;
     max-height: 70vh;
@@ -204,7 +226,7 @@
 #crop-controls {
     display: flex;
     flex-direction: column;
-    gap: 10px; /* Reduced from 15px */
+    gap: 10px;
     width: 100%;
     max-width: 400px;
     padding: 10px;
@@ -241,21 +263,32 @@
 .crop-button-group {
     display: flex;
     justify-content: space-between;
-    gap: 5px; /* Reduced from 10px */
+    gap: 5px;
+    flex-wrap: wrap; /* Allow wrapping if needed on smaller screens */
 }
 
 .crop-button-group button {
     flex: 1;
-    padding: 8px; /* Reduced from 10px */
+    padding: 8px;
     background-color: #000;
     color: white;
     border: none;
     cursor: pointer;
     border-radius: 5px;
+    min-width: 80px; /* Ensure buttons don't get too small */
 }
 
 .crop-button-group button:hover {
     background-color: #3a3a3a;
+}
+
+/* Specific styling for the upload button */
+.crop-button-group button#crop-upload {
+    background-color: rgb(20, 118, 74); /* Match the main upload button */
+}
+
+.crop-button-group button#crop-upload:hover {
+    background-color: rgb(25, 150, 94); /* Slightly lighter green on hover */
 }
 
 .crop-lock-group {
@@ -272,7 +305,7 @@
     font-size: 14px;
 }
 
-/* Preview Modal Specific */
+/* Preview Modal */
 #preview-modal .image-container {
     position: relative;
     display: inline-block;
@@ -298,39 +331,6 @@
     color: #333;
 }
 
-/* Download Modal (Dynamic) Specific */
-#download-modal-content {
-    max-width: 500px;
-}
-
-#download-modal-content h3 {
-    margin: 0 0 15px;
-    font-size: 18px;
-}
-
-#download-modal-content label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 14px;
-}
-
-#download-modal-content input,
-#download-modal-content select {
-    width: 100%;
-    padding: 5px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
-}
-
-#file-info {
-    margin-bottom: 15px;
-}
-
-#file-info p {
-    margin: 5px 0;
-    font-size: 14px;
-}
-
 /* Loading Indicator */
 #loading-indicator {
     position: fixed;
@@ -344,89 +344,132 @@
     z-index: 1003;
 }
 
-/* Responsive Design */
+/* Hide on Mobile */
+.hide-mobile {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .hide-mobile {
+        display: none;
+    }
+}
+
+/* Mobile Layout */
 @media (max-width: 768px) {
     .editor {
-        padding: 5px; /* Reduced padding on mobile */
+        padding: 0;
+        height: 100vh;
+        overflow: hidden;
     }
 
     #content {
         flex-direction: column;
         align-items: center;
-        gap: 10px; /* Reduced from implied larger spacing */
+        height: 100%;
+        gap: 0;
     }
 
     #image-container {
         width: 100%;
-        padding-right: 0;
-        margin-bottom: 10px; /* Reduced from 20px */
+        padding: 0;
+        height: calc(100vh - 240px); /* Increased to account for two rows */
+        position: relative;
+        top: 0;
+        left: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #fff;
+        z-index: 10;
+    }
+
+    #canvas {
+        max-width: 100%;
+        max-height: calc(100vh - 240px);
+        width: 100%;
+        height: auto;
+        object-fit: contain;
+        padding: 5px;
     }
 
     #controls-container {
+        position: fixed;
+        bottom: 0;
+        left: 0;
         width: 100%;
-        min-width: unset; /* Remove min-width on mobile */
+        height: 240px; /* Increased height for two button rows */
+        min-width: 0;
+        z-index: 20;
+        background-color: rgba(255, 255, 255, 0.95);
+        border-top: 2px solid #ccc;
+        overflow: hidden;
     }
 
-    .controls {
-        padding: 5px; /* Reduced from 10px */
+    #button-bar {
+        display: flex;
+        flex-wrap: wrap; /* Stack buttons in two rows */
+        justify-content: center; /* Center the buttons */
+        padding: 5px;
+        gap: 5px;
+        margin-bottom: 5px;
+        height: 80px; /* Fixed height for two rows */
+        overflow: hidden; /* Prevent overflow */
+    }
+
+    #button-bar button {
+        padding: 6px 8px; /* Smaller padding for tighter fit */
+        font-size: 11px; /* Smaller font for mobile */
+        max-width: 80px; /* Slightly smaller buttons */
+        min-height: 32px; /* Reduced height */
+        flex: 1 1 calc(33.33% - 10px); /* Aim for 3-4 buttons per row */
+        box-sizing: border-box;
+    }
+
+    #sliders-wrapper {
+        height: calc(100% - 80px); /* Remaining space after buttons */
+        overflow-y: auto;
+        padding: 5px 10px;
+        box-sizing: border-box;
+        touch-action: pan-y;
     }
 
     .controls div {
-        flex-direction: row; /* Changed to row for better mobile UX */
-        align-items: center;
-        margin-bottom: 4px; /* Reduced from 5px */
+        margin-bottom: 8px;
     }
 
     .controls label {
-        flex: 0 0 80px; /* Reduced from 90px */
-        margin-right: 5px;
-        margin-bottom: 0; /* Reset from column layout */
-        font-size: 12px; /* Smaller font */
+        flex: 0 0 80px;
+        font-size: 12px;
     }
 
     .controls input[type="range"] {
-        max-width: 100%;
+        max-width: none;
         margin: 0 5px;
     }
 
     .controls span {
-        flex: 0 0 30px; /* Reduced from 35px */
-        margin-top: 0; /* Reset from column layout */
-        font-size: 12px; /* Smaller font */
+        flex: 0 0 30px;
+        font-size: 12px;
     }
 
     .controls h3 {
-        margin: 10px 0 5px; /* Reduced spacing */
-        font-size: 14px; /* Reduced from 15px */
+        margin: 10px 0 5px;
+        font-size: 14px;
     }
 
-    .action-buttons {
-        margin-top: 5px; /* Reduced from 10px */
-        flex-direction: row; /* Keep row with wrapping */
-        gap: 5px;
-        justify-content: center;
-    }
-
-    .action-buttons button,
-    #upload-new-photo,
-    #toggle-original {
-        max-width: 90px; /* Reduced from 200px */
-        padding: 6px 10px; /* Reduced from 8px 15px */
-        font-size: 12px; /* Reduced from 13px */
-        min-height: 36px; /* Reduced from 40px */
-    }
-
-    /* Modal Responsiveness */
+    /* Modal Adjustments */
     .modal-content {
         width: 90%;
         margin: 5% auto;
-        padding: 10px; /* Reduced from 15px */
+        padding: 10px;
     }
 
     #image-modal .modal-inner {
         flex-direction: column;
         align-items: center;
-        gap: 10px; /* Reduced from 15px */
+        gap: 10px;
     }
 
     #modal-image {
@@ -435,7 +478,7 @@
 
     #modal-controls {
         width: 100%;
-        padding: 5px; /* Reduced from 10px */
+        padding: 5px;
     }
 
     #crop-canvas {
@@ -445,43 +488,36 @@
 
     #crop-controls {
         max-width: 100%;
-        padding: 5px; /* Reduced from 10px */
-        gap: 5px; /* Reduced from 10px */
-    }
-
-    .crop-control-group {
-        flex-direction: row; /* Changed to row for consistency */
-        align-items: center;
-    }
-
-    .crop-control-group label {
-        flex: 0 0 70px; /* Reduced from 80px */
-        margin-bottom: 0; /* Reset from column layout */
-        font-size: 12px; /* Smaller font */
-    }
-
-    .crop-control-group input[type="range"] {
-        width: 100%;
-        margin: 0 5px; /* Adjusted */
-    }
-
-    .crop-control-group span {
-        flex: 0 0 35px; /* Reduced from 40px */
-        margin-top: 0; /* Reset from column layout */
-        font-size: 12px; /* Smaller font */
-    }
-
-    .crop-button-group {
-        flex-direction: row; /* Keep row with wrapping */
+        padding: 5px;
         gap: 5px;
     }
 
-    .crop-button-group button {
-        padding: 6px; /* Reduced from 8px */
-        width: 100%;
+    .crop-control-group label {
+        flex: 0 0 70px;
+        font-size: 12px;
     }
 
-    #download-modal-content {
-        max-width: 90%;
+    .crop-control-group input[type="range"] {
+        margin: 0 5px;
     }
+
+    .crop-control-group span {
+        flex: 0 0 35px;
+        font-size: 12px;
+    }
+    .crop-button-group {
+        gap: 5px;
+    }
+    .crop-button-group button {
+        padding: 6px;
+        font-size: 12px;
+        min-width: 70px;
+    }
+    .controls {
+        max-height: 50vh; /* Adjust height as needed */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    }
+    
+
 }
