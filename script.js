@@ -281,7 +281,7 @@ if (window.Worker) {
 }
 
 downloadButton.addEventListener('click', () => {
-    const isEdited = Object.values(settings).some(value => value !== 100 && value !== 0);
+    const isEdited = Object.values(state.settings).some(value => value !== 100 && value !== 0);
     const popup = document.createElement('div');
     popup.style.position = 'fixed';
     popup.style.top = '50%';
@@ -336,12 +336,12 @@ downloadButton.addEventListener('click', () => {
     const fileTypeSelect = document.getElementById('save-file-type');
     const dimensionsSpan = document.getElementById('dimensions');
     const fileSizeSpan = document.getElementById('file-size');
-    const originalDataURL = img.src;
+    const originalDataURL = state.img.src;
 
     function updateFileInfo() {
         const scale = parseFloat(resolutionSelect.value) / 100;
-        const width = Math.round((originalWidth || 1) * scale);
-        const height = Math.round((originalHeight || 1) * scale);
+        const width = Math.round((state.originalWidth || 1) * scale);
+        const height = Math.round((state.originalHeight || 1) * scale);
         dimensionsSpan.textContent = `${width} x ${height}`;
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
@@ -349,8 +349,8 @@ downloadButton.addEventListener('click', () => {
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-        if (originalWidth && originalHeight) {
-            tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
+        if (state.originalWidth && state.originalHeight) {
+            tempCtx.drawImage(state.fullResCanvas, 0, 0, width, height);
         } else {
             tempCtx.fillStyle = '#000';
             tempCtx.fillRect(0, 0, width, height);
@@ -379,21 +379,8 @@ downloadButton.addEventListener('click', () => {
         const scale = parseFloat(resolutionSelect.value) / 100;
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
-    
-        if (!originalWidth || !originalHeight) {
-            console.error("Invalid dimensions for download:", originalWidth, originalHeight);
-            alert("Cannot download: Image dimensions are invalid.");
-            return;
-        }
-    
         showLoadingIndicator(true);
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = Math.round(originalWidth * scale);
-        tempCanvas.height = Math.round(originalHeight * scale);
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.imageSmoothingEnabled = true;
-        tempCtx.imageSmoothingQuality = 'high';
-    
+
         if (!isEdited && scale === 1.0) {
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
@@ -404,52 +391,46 @@ downloadButton.addEventListener('click', () => {
             document.body.removeChild(overlay);
             return;
         }
-    
-        if (!img || !img.complete || img.naturalWidth === 0) {
-            console.error("Image not ready for download:", img);
-            showLoadingIndicator(false);
-            alert("Image is not loaded properly.");
-            return;
-        }
-    
-        redrawImage(
-            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-            isShowingOriginal, trueOriginalImage, modal, modalImage, false
-        ).then(() => {
-            tempCtx.drawImage(fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
-            const quality = fileType === 'image/png' ? undefined : 1.0;
-            tempCanvas.toBlob((blob) => {
-                if (!blob || blob.size === 0) {
-                    console.error("Generated blob is empty");
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = Math.round(state.originalWidth * scale);
+        tempCanvas.height = Math.round(state.originalHeight * scale);
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.imageSmoothingEnabled = true;
+        tempCtx.imageSmoothingQuality = 'high';
+
+        // Ensure redrawImage updates fullResCanvas before drawing
+        redrawImage(state, false)
+            .then(() => {
+                tempCtx.drawImage(state.fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+                const quality = fileType === 'image/png' ? undefined : 1.0;
+                tempCanvas.toBlob((blob) => {
+                    if (!blob) {
+                        console.error('Generated blob is empty');
+                        showLoadingIndicator(false);
+                        document.body.removeChild(popup);
+                        document.body.removeChild(overlay);
+                        return;
+                    }
+                    const link = document.createElement('a');
+                    link.download = `${sanitizedFileName}-${Math.round(scale * 100)}%.${extension}`;
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    URL.revokeObjectURL(link.href);
                     showLoadingIndicator(false);
-                    alert("Failed to generate downloadable image.");
-                    return;
-                }
-                const link = document.createElement('a');
-                link.download = `${sanitizedFileName}-${Math.round(scale * 100)}%.${extension}`;
-                link.href = URL.createObjectURL(blob);
-                link.click();
-                URL.revokeObjectURL(link.href);
+                    document.body.removeChild(popup);
+                    document.body.removeChild(overlay);
+                }, fileType, quality);
+            })
+            .catch(error => {
+                console.error('Error during redraw for download:', error);
                 showLoadingIndicator(false);
                 document.body.removeChild(popup);
                 document.body.removeChild(overlay);
-            }, fileType, quality);
-        }).catch(error => {
-            console.error("Download failed:", error);
-            showLoadingIndicator(false);
-            alert("An error occurred while processing the image.");
-            document.body.removeChild(popup);
-            document.body.removeChild(overlay);
-        });
+            });
     });
 
     saveCancelBtn.addEventListener('click', () => {
-        document.body.removeChild(popup);
-        document.body.removeChild(overlay);
-    });
-
-    saveCancelBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
         document.body.removeChild(popup);
         document.body.removeChild(overlay);
     });

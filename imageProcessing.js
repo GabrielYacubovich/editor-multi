@@ -354,62 +354,52 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 }
 
 // Redraw Image (unchanged, works with updated filters)
-function redrawImage(
-    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-    isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
-) {
-    console.log("redrawImage - img:", img, "settings:", settings);
-    if (!img) {
-        console.error("redrawImage: img is undefined or null");
-        showLoadingIndicator(false);
-        return Promise.reject("Missing img");
-    }
-    if (!img.complete || img.naturalWidth === 0) {
-        console.error("redrawImage: img is not loaded or has invalid dimensions", img.src);
-        showLoadingIndicator(false);
-        return Promise.reject("Image not loaded");
-    }
-    showLoadingIndicator(true);
-    fullResCanvas.width = img.width;
-    fullResCanvas.height = img.height;
-    if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
-        console.error("redrawImage: Invalid canvas dimensions", fullResCanvas.width, fullResCanvas.height);
+export function redrawImage(state, saveState = false) {
+    showLoadingIndicator(true); // Assuming this is imported or available
+    state.fullResCanvas.width = state.originalWidth;
+    state.fullResCanvas.height = state.originalHeight;
+
+    if (state.fullResCanvas.width === 0 || state.fullResCanvas.height === 0) {
         showLoadingIndicator(false);
         return Promise.reject("Invalid canvas dimensions");
     }
-    fullResCtx.clearRect(0, 0, fullResCanvas.width, fullResCanvas.height);
-    fullResCtx.drawImage(img, 0, 0, fullResCanvas.width, fullResCanvas.height);
-    applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
+
+    const fullResCtx = state.fullResCanvas.getContext('2d');
+    fullResCtx.clearRect(0, 0, state.fullResCanvas.width, state.fullResCanvas.height);
+    fullResCtx.drawImage(state.img, 0, 0, state.originalWidth, state.originalHeight);
+
+    applyBasicFiltersManually(fullResCtx, state.fullResCanvas, state.settings); // Ensure this is imported
     const scaleFactor = 1;
-    return applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor)
-        .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
-        .then(() => applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
+
+    return applyAdvancedFilters(fullResCtx, state.fullResCanvas, state.noiseSeed, scaleFactor) // Ensure imported
+        .then(() => applyGlitchEffects(fullResCtx, state.fullResCanvas, state.noiseSeed, scaleFactor)) // Ensure imported
+        .then(() => applyComplexFilters(fullResCtx, state.fullResCanvas, state.noiseSeed, scaleFactor)) // Ensure imported
         .then(() => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (isShowingOriginal && trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
+            const ctx = state.canvas.getContext('2d');
+            ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+            if (state.isShowingOriginal && state.trueOriginalImage.complete && state.trueOriginalImage.naturalWidth !== 0) {
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(state.trueOriginalImage, 0, 0, state.canvas.width, state.canvas.height);
             } else {
-                if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
+                if (state.fullResCanvas.width === 0 || state.fullResCanvas.height === 0) {
                     showLoadingIndicator(false);
                     return;
                 }
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(state.fullResCanvas, 0, 0, state.canvas.width, state.canvas.height);
             }
-            if (modal.style.display === 'block') {
-                modalImage.src = canvas.toDataURL('image/png');
+            if (state.modal.style.display === 'block') {
+                state.modalImage.src = state.canvas.toDataURL('image/png');
             }
-            if (saveState && saveImageStateCallback) {
-                saveImageStateCallback();
-            }
+            if (saveState) saveImageState(state); // Ensure this is imported or defined
             showLoadingIndicator(false);
-        }).catch(err => {
-            console.error("redrawImage failed during processing:", err);
+        })
+        .catch(err => {
+            console.error('Redraw error:', err);
             showLoadingIndicator(false);
-            throw err; // Re-throw to propagate the error
+            throw err;
         });
 }
 
