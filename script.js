@@ -71,7 +71,6 @@ function triggerFileUpload() {
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            console.log("trueOriginalImage set:", trueOriginalImage.src);
             originalUploadedImage.src = event.target.result;
             showCropModal(event.target.result);
             cleanupFileInput();
@@ -170,7 +169,6 @@ img.onload = function () {
     originalHeight = img.height;
     fullResCanvas.width = originalWidth;
     fullResCanvas.height = originalHeight;
-    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
 
     const maxDisplayWidth = Math.min(1920, window.innerWidth - 20);
     const maxDisplayHeight = window.innerHeight - (window.innerWidth <= 768 ? 0.4 * window.innerHeight + 20 : 250);
@@ -212,29 +210,26 @@ img.onload = function () {
 
     canvas.width = Math.round(previewWidth);
     canvas.height = Math.round(previewHeight);
-    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-    const initialImageData = fullResCtx.getImageData(0, 0, originalWidth, originalHeight);
-    fullResCtx.putImageData(initialImageData, 0, 0);
-    ctx.drawImage(fullResCanvas, 0, 0, previewWidth, previewHeight);
 
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = previewWidth;
-    tempCanvas.height = previewHeight;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.drawImage(img, 0, 0, previewWidth, previewHeight);
-    originalImageData = tempCtx.getImageData(0, 0, previewWidth, previewHeight);
     if (!originalUploadedImage.src || originalUploadedImage.src === "") {
         originalUploadedImage.src = img.src;
     }
+
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
     ).then(() => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = previewWidth;
+        tempCanvas.height = previewHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(img, 0, 0, previewWidth, previewHeight);
+        originalImageData = tempCtx.getImageData(0, 0, previewWidth, previewHeight);
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+        uploadNewPhotoButton.style.display = 'block';
     }).catch(err => {
         console.error("Failed to redraw image on load:", err);
     });
-    uploadNewPhotoButton.style.display = 'block';
 };
 
 let filterWorker;

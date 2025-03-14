@@ -359,6 +359,13 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 }
 
 // Redraw Image
+javascript
+
+Collapse
+
+Wrap
+
+Copy
 function redrawImage(
     ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
     isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
@@ -377,39 +384,41 @@ function redrawImage(
         showLoadingIndicator(false);
         return Promise.reject("Invalid canvas dimensions");
     }
-    fullResCtx.clearRect(0, 0, fullResCanvas.width, fullResCanvas.height);
-    fullResCtx.drawImage(img, 0, 0, fullResCanvas.width, fullResCanvas.height);
-    applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
-    const scaleFactor = 1;
-    return applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor)
-        .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
-        .then(() => applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
-        .then(() => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (isShowingOriginal && trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-            } else {
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-            }
-            if (modal && modal.style.display === 'block') {
-                modalImage.src = canvas.toDataURL('image/png');
-            }
-            if (saveState && saveImageStateCallback) {
-                saveImageStateCallback();
-            }
-            showLoadingIndicator(false);
-        })
-        .catch(err => {
-            console.error("redrawImage failed during processing:", err);
-            showLoadingIndicator(false);
-            throw err;
-        });
-}
 
+    // Defer heavy work to next tick
+    return Promise.resolve().then(() => {
+        fullResCtx.clearRect(0, 0, fullResCanvas.width, fullResCanvas.height);
+        fullResCtx.drawImage(img, 0, 0, fullResCanvas.width, fullResCanvas.height);
+        applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
+        const scaleFactor = 1;
+        return applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor)
+            .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
+            .then(() => applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
+            .then(() => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (isShowingOriginal && trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
+                } else {
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+                }
+                if (modal && modal.style.display === 'block') {
+                    modalImage.src = canvas.toDataURL('image/png');
+                }
+                if (saveState && saveImageStateCallback) {
+                    saveImageStateCallback();
+                }
+                showLoadingIndicator(false);
+            });
+    }).catch(err => {
+        console.error("redrawImage failed during processing:", err);
+        showLoadingIndicator(false);
+        throw err;
+    });
+}
 // Utility function
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
