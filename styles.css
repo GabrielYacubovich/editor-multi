@@ -225,85 +225,102 @@ body {
 }
 
 #crop-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-    max-width: 400px;
-    padding: 10px;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    margin: 10px auto 0;
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 600px;
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
 }
 
 .crop-control-group {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
+    margin-bottom: 15px;
 }
 
 .crop-control-group label {
-    flex: 0 0 80px;
+    display: inline-block;
+    width: 80px;
+    margin-right: 10px;
     font-size: 14px;
 }
 
 .crop-control-group input[type="range"] {
-    flex: 1;
-    margin: 0 10px;
+    width: calc(100% - 150px);
+    vertical-align: middle;
 }
 
 .crop-control-group span {
-    flex: 0 0 40px;
-    font-size: 14px;
-    font-weight: bold;
+    display: inline-block;
+    width: 40px;
     text-align: right;
-    cursor: pointer;
+    font-size: 14px;
 }
 
 .crop-button-group {
     display: flex;
-    justify-content: space-between;
-    gap: 5px;
-    flex-wrap: wrap; /* Allow wrapping if needed on smaller screens */
+    gap: 10px;
+    margin: 15px 0;
 }
 
 .crop-button-group button {
     flex: 1;
-    padding: 8px;
+    padding: 8px 15px;
     background-color: #000;
     color: white;
     border: none;
+    border-radius: 20px;
     cursor: pointer;
-    border-radius: 5px;
-    min-width: 80px; /* Ensure buttons don't get too small */
+    font-size: 14px;
+    transition: background-color 0.2s;
 }
 
 .crop-button-group button:hover {
-    background-color: #3a3a3a;
-}
-
-/* Specific styling for the upload button */
-.crop-button-group button#crop-upload {
-    background-color: rgb(20, 118, 74); /* Match the main upload button */
-}
-
-.crop-button-group button#crop-upload:hover {
-    background-color: rgb(25, 150, 94); /* Slightly lighter green on hover */
+    background-color: #333;
 }
 
 .crop-lock-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    margin-top: 10px;
 }
 
 .crop-lock-group input[type="checkbox"] {
-    margin: 0;
+    width: 16px;
+    height: 16px;
 }
 
 .crop-lock-group label {
     font-size: 14px;
+    cursor: pointer;
+}
+
+#crop-canvas {
+    display: block;
+    max-width: 100%;
+    max-height: calc(90vh - 200px);
+    margin: 0 auto;
+    touch-action: none;
+}
+
+@media (max-width: 768px) {
+    #crop-controls {
+        padding: 10px;
+    }
+
+    .crop-button-group {
+        flex-wrap: wrap;
+    }
+
+    .crop-button-group button {
+        min-width: calc(50% - 5px);
+        font-size: 13px;
+    }
 }
 
 /* Preview Modal */

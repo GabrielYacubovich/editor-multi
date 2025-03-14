@@ -257,48 +257,65 @@ if (window.Worker) {
 function triggerFileUpload() {
     if (isTriggering) return;
     isTriggering = true;
+
+    cleanupFileInput();
     fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
     fileInput.style.display = 'none';
     document.body.appendChild(fileInput);
 
-    fileInput.addEventListener('change', (e) => {
+    fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
-        if (!file) {
-            cleanupFileInput();
-            return;
-        }
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                img = new Image();
+                img.onload = function() {
+                    originalWidth = img.naturalWidth;
+                    originalHeight = img.naturalHeight;
+                    
+                    // Set up preview dimensions
+                    const maxPreviewDimension = 800;
+                    const aspectRatio = originalWidth / originalHeight;
+                    if (aspectRatio > 1) {
+                        previewWidth = Math.min(maxPreviewDimension, originalWidth);
+                        previewHeight = previewWidth / aspectRatio;
+                    } else {
+                        previewHeight = Math.min(maxPreviewDimension, originalHeight);
+                        previewWidth = previewHeight * aspectRatio;
+                    }
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            if (!event.target || typeof event.target.result !== 'string') {
-                cleanupFileInput();
-                return;
-            }
+                    canvas.width = previewWidth;
+                    canvas.height = previewHeight;
+                    fullResCanvas.width = originalWidth;
+                    fullResCanvas.height = originalHeight;
 
-            const img = new Image();
-            img.onload = () => {
-                trueOriginalImage.src = event.target.result;
-                originalUploadedImage.src = event.target.result;
-                showCropModal(event.target.result);
-                cleanupFileInput();
+                    // Draw image at both resolutions
+                    ctx.drawImage(img, 0, 0, previewWidth, previewHeight);
+                    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
+
+                    // Store original images
+                    trueOriginalImage.src = event.target.result;
+                    originalUploadedImage.src = event.target.result;
+                    originalFullResImage.src = event.target.result;
+
+                    // Save initial state and show crop modal
+                    originalImageData = ctx.getImageData(0, 0, previewWidth, previewHeight);
+                    saveImageState();
+                    showCropModal(img);
+                };
+                img.src = event.target.result;
             };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
+            reader.readAsDataURL(file);
+        }
+        cleanupFileInput();
     });
 
+    fileInput.click();
     setTimeout(() => {
-        fileInput.click();
-    }, 0);
-
-    // Safety timeout to cleanup if no file is selected
-    setTimeout(() => {
-        if (isTriggering && fileInput && document.body.contains(fileInput)) {
-            cleanupFileInput();
-        }
-    }, 300000); // 5 minutes timeout
+        isTriggering = false;
+    }, 1000);
 }
 
 function cleanupFileInput() {
@@ -306,7 +323,6 @@ function cleanupFileInput() {
         document.body.removeChild(fileInput);
     }
     fileInput = null;
-    isTriggering = false;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -314,173 +330,102 @@ document.addEventListener('DOMContentLoaded', () => {
     cropCtx = cropCanvas.getContext('2d');
     cropModal = document.getElementById('crop-modal');
 
-    setupModal(modal, false);
-    setupModal(cropModal, false);
-    setupModal(previewModal, true);
-
     initializeCropHandler({
-        cropModal,
-        cropCanvas,
-        cropCtx,
-        canvas,
-        ctx,
-        fullResCanvas,
-        fullResCtx,
-        img,
-        trueOriginalImage,
-        originalUploadedImage,
-        originalFullResImage,
-        modal,
-        modalImage,
-        settings,
-        noiseSeed,
-        isShowingOriginal,
-        originalWidth,
-        originalHeight,
-        previewWidth,
-        previewHeight,
-        uploadNewPhotoButton,
-        saveImageState,
-        originalImageData,
-        rotation,
-        cropRect,
-        originalCropRect,
-        initialCropRect,
-        originalRotation,
-        initialRotation,
-        isDragging,
-        dragStartX,
-        dragStartY,
-        dragStartCropRect,
-        isResizing,
-        resizeHandle,
-        cropImage
+        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx,
+        img, trueOriginalImage, originalUploadedImage, originalFullResImage,
+        modal, modalImage, settings, noiseSeed, isShowingOriginal,
+        originalWidth, originalHeight, previewWidth, previewHeight,
+        uploadNewPhotoButton, saveImageState, originalImageData,
+        rotation, cropRect, originalCropRect, initialCropRect,
+        originalRotation, initialRotation, isDragging,
+        dragStartX, dragStartY, dragStartCropRect,
+        isResizing, resizeHandle, cropImage
     });
 
+    // Set up the triggerFileUpload function
     setTriggerFileUpload(triggerFileUpload);
 
-    controls.forEach(control => {
-        control.addEventListener('input', (e) => {
-            const id = e.target.id;
-            const newValue = parseInt(e.target.value);
-            settings[id] = newValue;
-            updateControlIndicators();
-            if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
-                lastAppliedEffect = id;
+    // Add event listeners for upload and crop buttons
+    if (uploadNewPhotoButton) {
+        uploadNewPhotoButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!isTriggering) {
+                triggerFileUpload();
             }
-            saveImageState();
         });
-    });
+    }
 
     if (cropImageButton) {
-        cropImageButton.addEventListener('click', () => {
-            if (img.complete && img.naturalWidth !== 0) {
-                showCropModal(canvas.toDataURL('image/png'));
-            }
+        cropImageButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            showCropModal(img);
         });
     }
-
-    if (restoreButton) {
-        restoreButton.addEventListener('click', () => {
-            settings = {
-                brightness: 100,
-                contrast: 100,
-                grayscale: 0,
-                vibrance: 100,
-                highlights: 100,
-                shadows: 100,
-                noise: 0,
-                exposure: 100,
-                temperature: 100,
-                saturation: 100,
-                'glitch-chromatic': 0,
-                'glitch-rgb-split': 0,
-                'glitch-chromatic-vertical': 0,
-                'glitch-chromatic-diagonal': 0,
-                'glitch-pixel-shuffle': 0,
-                'glitch-wave': 0,
-                'kaleidoscope-segments': 0,
-                'kaleidoscope-offset': 0,
-                'vortex-twist': 0,
-                'edge-detect': 0
-            };
-
-            document.querySelectorAll('.controls input').forEach(input => {
-                input.value = settings[input.id];
-            });
-            updateControlIndicators();
-
-            fullResCanvas.width = originalWidth;
-            fullResCanvas.height = originalHeight;
-            fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-
-            if (img.complete && img.naturalWidth !== 0) {
-                redrawImage(
-                    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                    isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                ).then(() => {
-                    originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                    ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-                });
-            }
-        });
-    }
-
-    initialize();
 });
 
-uploadNewPhotoButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    triggerFileUpload();
-});
-uploadNewPhotoButton.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    triggerFileUpload();
+controls.forEach(control => {
+    control.addEventListener('input', (e) => {
+        const id = e.target.id;
+        const newValue = parseInt(e.target.value);
+        settings[id] = newValue;
+        updateControlIndicators();
+        if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+            lastAppliedEffect = id;
+        }
+        saveImageState();
+    });
 });
 
-if (toggleOriginalButton) {
-    toggleOriginalButton.addEventListener('click', () => {
-        if (trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
-            isShowingOriginal = !isShowingOriginal;
-            toggleOriginalButton.textContent = isShowingOriginal ? 'Ver Editada' : 'Ver Original';
-            
-            if (isShowingOriginal) {
-                originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-            } else {
-                if (originalImageData) {
-                    ctx.putImageData(originalImageData, 0, 0);
-                } else {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        false, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
-                }
-            }
+if (cropImageButton) {
+    cropImageButton.addEventListener('click', () => {
+        if (img.complete && img.naturalWidth !== 0) {
+            showCropModal(canvas.toDataURL('image/png'));
         }
     });
+}
 
-    toggleOriginalButton.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
-            isShowingOriginal = !isShowingOriginal;
-            toggleOriginalButton.textContent = isShowingOriginal ? 'Ver Editada' : 'Ver Original';
-            
-            if (isShowingOriginal) {
-                originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-            } else {
-                if (originalImageData) {
-                    ctx.putImageData(originalImageData, 0, 0);
-                } else {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        false, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
-                }
-            }
+if (restoreButton) {
+    restoreButton.addEventListener('click', () => {
+        settings = {
+            brightness: 100,
+            contrast: 100,
+            grayscale: 0,
+            vibrance: 100,
+            highlights: 100,
+            shadows: 100,
+            noise: 0,
+            exposure: 100,
+            temperature: 100,
+            saturation: 100,
+            'glitch-chromatic': 0,
+            'glitch-rgb-split': 0,
+            'glitch-chromatic-vertical': 0,
+            'glitch-chromatic-diagonal': 0,
+            'glitch-pixel-shuffle': 0,
+            'glitch-wave': 0,
+            'kaleidoscope-segments': 0,
+            'kaleidoscope-offset': 0,
+            'vortex-twist': 0,
+            'edge-detect': 0
+        };
+
+        document.querySelectorAll('.controls input').forEach(input => {
+            input.value = settings[input.id];
+        });
+        updateControlIndicators();
+
+        fullResCanvas.width = originalWidth;
+        fullResCanvas.height = originalHeight;
+        fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
+
+        if (img.complete && img.naturalWidth !== 0) {
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+            ).then(() => {
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+            });
         }
     });
 }
