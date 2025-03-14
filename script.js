@@ -542,11 +542,8 @@ addButtonListeners(redoButton, debouncedRedo);
 
 cropImageButton.addEventListener('click', (e) => {
     e.preventDefault();
-    if (!img.src || img.src === "") {
-        console.error("No image source available to crop");
-        return;
-    }
-    showCropModal(img.src); // Pass img.src
+    if (!img.src || img.src === '') return;
+    showCropModal();
 });
 
 cropImageButton.addEventListener('touchend', (e) => {
