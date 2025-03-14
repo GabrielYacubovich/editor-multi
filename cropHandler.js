@@ -7,7 +7,7 @@ import { redrawWorker } from './script.js'; // Add this import
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-    uploadNewPhotoButton, saveImageState, originalImageData;
+    uploadNewPhotoButton, saveImageState, originalImageData, redrawWorker;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
 let initialCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Last confirmed state
 let initialRotation = 0; // Last confirmed rotation
@@ -25,7 +25,7 @@ export function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-       previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData } = options);
+       previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData, redrawWorker } = options);
     setupModal(cropModal, false);
 }
 
@@ -224,7 +224,6 @@ function setupCropControls() {
         if (redrawWorker) {
             const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
             redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
-            // Loading indicator is hidden by redrawWorker.onmessage in script.js
         } else {
             // Fallback: Use requestAnimationFrame to split work
             requestAnimationFrame(() => {
