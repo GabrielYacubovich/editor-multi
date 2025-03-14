@@ -216,72 +216,30 @@ function setupCropControls() {
             cropX, cropY, cropWidth, cropHeight,
             0, 0, cropWidth, cropHeight
         );
-        canvas.style.display = 'none'; // Hide before setting img.src
-        img.src = tempCanvas.toDataURL('image/png');
-        originalUploadedImage.src = tempCanvas.toDataURL('image/png');
-        trueOriginalImage.src = tempCanvas.toDataURL('image/png'); // Sync trueOriginalImage
-
-        trueOriginalImage.onload = () => { // Ensure trueOriginalImage is loaded
-            originalWidth = tempCanvas.width;
-            originalHeight = tempCanvas.height;
-            fullResCanvas.width = originalWidth;
-            fullResCanvas.height = originalHeight;
-            fullResCtx.drawImage(tempCanvas, 0, 0, originalWidth, originalHeight);
-
-            const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
-            const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
-            const minPreviewDimension = 800;
-            const ratio = originalWidth / originalHeight;
-
-            if (ratio > 1) {
-                previewWidth = Math.min(originalWidth, maxDisplayWidth);
-                previewHeight = previewWidth / ratio;
-                if (previewHeight > maxDisplayHeight) {
-                    previewHeight = maxDisplayHeight;
-                    previewWidth = previewHeight * ratio;
-                }
-                if (previewHeight < minPreviewDimension) {
-                    previewHeight = minPreviewDimension;
-                    previewWidth = previewHeight * ratio;
-                }
-            } else {
-                previewHeight = Math.min(originalHeight, maxDisplayHeight);
-                previewWidth = previewHeight * ratio;
-                if (previewWidth > maxDisplayWidth) {
-                    previewWidth = maxDisplayWidth;
-                    previewHeight = previewWidth / ratio;
-                }
-                if (previewWidth < minPreviewDimension) {
-                    previewWidth = minPreviewDimension;
-                    previewHeight = previewWidth / ratio;
-                }
-            }
-
-            canvas.width = Math.round(previewWidth);
-            canvas.height = Math.round(previewHeight);
-
-            redrawImage(
-                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-            ).then(() => {
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                canvas.style.display = 'block'; // Show after render
-            }).catch(err => {
-                console.error("Redraw after crop failed:", err);
-                canvas.style.display = 'block'; // Show even on error
-            }).finally(() => {
-                closeModal(cropModal);
-                if (uploadNewPhotoButton) uploadNewPhotoButton.style.display = 'block';
-            });
-        };
-
-        trueOriginalImage.onerror = () => {
-            console.error("Failed to load trueOriginalImage after crop:", trueOriginalImage.src);
-            closeModal(cropModal);
-            canvas.style.display = 'block'; // Show on error
-        };
-
-        // Update last confirmed state, not original state
+    
+        if (redrawWorker) {
+            const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
+            redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
+        } else {
+            img.src = tempCanvas.toDataURL('image/png');
+            originalUploadedImage.src = img.src;
+            trueOriginalImage.src = img.src;
+            trueOriginalImage.onload = () => {
+                originalWidth = cropWidth;
+                originalHeight = cropHeight;
+                fullResCanvas.width = originalWidth;
+                fullResCanvas.height = originalHeight;
+                fullResCtx.drawImage(tempCanvas, 0, 0);
+                canvas.width = Math.round(previewWidth);
+                canvas.height = Math.round(previewHeight);
+                redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState)
+                    .then(() => {
+                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                        canvas.style.display = 'block';
+                    });
+            };
+        }
+    
         initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
         initialRotation = rotation;
     });
