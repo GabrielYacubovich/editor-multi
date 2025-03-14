@@ -1,10 +1,10 @@
 // script.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
-import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
-import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
+import { redrawImage } from './imageProcessing.js';
+import { initializeCropHandler, showCropModal, setTriggerFileUpload } from './cropHandler.js';
 
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d', { willReadFrequently: true });
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
 const controls = document.querySelectorAll('.controls input');
 const undoButton = document.getElementById('undo');
 const redoButton = document.getElementById('redo');
@@ -28,6 +28,7 @@ let isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
 let trueOriginalImage = new Image();
+
 let settings = {
     brightness: 100,
     contrast: 100,
@@ -57,40 +58,26 @@ let originalWidth, originalHeight, previewWidth, previewHeight;
 
 let isTriggering = false;
 let fileInput = null;
-
-function triggerFileUpload() {
-    isTriggering = true;
-    fileInput = document.createElement('input');
+function updateFullResContext() {
+    fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
+    if (!fullResCtx) {
+        console.error('Failed to initialize fullResCtx');
+    }
+}function triggerFileUpload() {
+    const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
-    fileInput.style.display = 'none';
-    document.body.appendChild(fileInput);
-
-    fileInput.addEventListener('change', (e) => {
+    fileInput.onchange = (e) => {
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            trueOriginalImage.onload = () => {
-                originalUploadedImage.src = event.target.result;
-                showCropModal(event.target.result, {
-                    cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, 
-                    settings, noiseSeed, initialRotation: 0, img, canvas, fullResCanvas, fullResCtx, 
-                    originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, 
-                    originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage
-                });
-            };
-            cleanupFileInput();
+            originalUploadedImage.src = event.target.result;
+            showCropModal(event.target.result, { cropCanvas, cropCtx, fullResCanvas, fullResCtx, img, canvas, ctx });
         };
-        reader.onerror = cleanupFileInput;
         reader.readAsDataURL(file);
-    });
-    setTimeout(() => fileInput.click(), 0);
-    setTimeout(() => {
-        if (isTriggering && fileInput && document.body.contains(fileInput)) {
-            cleanupFileInput();
-        }
-    }, 1000);
+    };
+    fileInput.click();
 }
 
 function cleanupFileInput() {
@@ -184,70 +171,65 @@ img.onload = function () {
     originalHeight = img.height;
     fullResCanvas.width = originalWidth;
     fullResCanvas.height = originalHeight;
+    updateFullResContext(); // Reinitialize context after resizing
+    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
 
-    const maxDisplayWidth = Math.min(1920, window.innerWidth - 20);
-    const maxDisplayHeight = window.innerHeight - (window.innerWidth <= 768 ? 0.4 * window.innerHeight + 20 : 250);
-    const minPreviewDimension = 400;
+    const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
+    const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
+    const minPreviewDimension = 800;
     const ratio = originalWidth / originalHeight;
 
-    if (window.innerWidth <= 768) {
+    if (ratio > 1) {
+        previewWidth = Math.min(originalWidth, maxDisplayWidth);
+        previewHeight = previewWidth / ratio;
+        if (previewHeight > maxDisplayHeight) {
+            previewHeight = maxDisplayHeight;
+            previewWidth = previewHeight * ratio;
+        }
+        if (previewHeight < minPreviewDimension) {
+            previewHeight = minPreviewDimension;
+            previewWidth = previewHeight * ratio;
+        }
+    } else {
         previewHeight = Math.min(originalHeight, maxDisplayHeight);
         previewWidth = previewHeight * ratio;
         if (previewWidth > maxDisplayWidth) {
             previewWidth = maxDisplayWidth;
             previewHeight = previewWidth / ratio;
         }
-    } else {
-        if (ratio > 1) {
-            previewWidth = Math.min(originalWidth, maxDisplayWidth);
+        if (previewWidth < minPreviewDimension) {
+            previewWidth = minPreviewDimension;
             previewHeight = previewWidth / ratio;
-            if (previewHeight > maxDisplayHeight) {
-                previewHeight = maxDisplayHeight;
-                previewWidth = previewHeight * ratio;
-            }
-            if (previewHeight < minPreviewDimension) {
-                previewHeight = minPreviewDimension;
-                previewWidth = previewHeight * ratio;
-            }
-        } else {
-            previewHeight = Math.min(originalHeight, maxDisplayHeight);
-            previewWidth = previewHeight * ratio;
-            if (previewWidth > maxDisplayWidth) {
-                previewWidth = maxDisplayWidth;
-                previewHeight = previewWidth / ratio;
-            }
-            if (previewWidth < minPreviewDimension) {
-                previewWidth = minPreviewDimension;
-                previewHeight = previewWidth / ratio;
-            }
         }
     }
 
     canvas.width = Math.round(previewWidth);
     canvas.height = Math.round(previewHeight);
+    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true);
 
-    if (!originalUploadedImage.src || originalUploadedImage.src === "") {
-        originalUploadedImage.src = img.src;
-    }
+document.getElementById('upload-new-photo').addEventListener('click', triggerFileUpload);
 
-    redrawImage(
-        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-    ).then(() => {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = previewWidth;
-        tempCanvas.height = previewHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, 0, 0, previewWidth, previewHeight);
-        originalImageData = tempCtx.getImageData(0, 0, previewWidth, previewHeight);
-        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-        uploadNewPhotoButton.style.display = 'block';
-        canvas.style.display = 'block'; // Show canvas after render
-    }).catch(err => {
-        console.error("Failed to redraw image on load:", err);
-        canvas.style.display = 'block'; // Show even on error to avoid infinite hide
-    });
-};
+const cropCanvas = document.getElementById('crop-canvas');
+const cropCtx = cropCanvas.getContext('2d');
+initializeCropHandler({
+    cropCanvas,
+    cropCtx,
+    fullResCanvas,
+    fullResCtx,
+    img,
+    canvas,
+    ctx,
+    redrawImage,
+    originalUploadedImage,
+    trueOriginalImage,
+    originalWidth,
+    originalHeight
+
+
+});
+}
+
+
 let filterWorker;
 if (window.Worker) {
     filterWorker = new Worker(URL.createObjectURL(new Blob([`

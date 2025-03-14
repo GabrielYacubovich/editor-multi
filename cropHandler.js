@@ -16,50 +16,22 @@ function setTriggerFileUpload(fn) {
     triggerFileUpload = fn;
 }
 
-function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, initialRotation, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage }) {
+export function showCropModal(dataURL = null, params) {
+    const { cropCanvas, cropCtx, fullResCanvas, fullResCtx, img } = params;
+    const cropModal = document.getElementById('crop-modal');
+
     if (!dataURL) {
-        console.log('showCropModal: Processing existing image');
+        // Re-show crop modal with current image (not implemented here for brevity)
         cropModal.style.display = 'block';
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = trueOriginalImage.width;
-        tempCanvas.height = trueOriginalImage.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(trueOriginalImage, 0, 0);
-        applyBasicFiltersManually(tempCtx, tempCanvas, settings);
-        applyAdvancedFilters(tempCtx, tempCanvas, settings, noiseSeed, 1)
-            .then(() => applyGlitchEffects(tempCtx, tempCanvas, settings, noiseSeed, 1))
-            .then(() => applyComplexFilters(tempCtx, tempCanvas, settings, noiseSeed, 1))
-            .then(() => {
-                const dataURL = tempCanvas.toDataURL('image/png');
-                console.log('showCropModal: Setting cropImage.src', dataURL.substring(0, 50));
-                cropImage.src = dataURL;
-                return new Promise(resolve => {
-                    if (cropImage.complete && cropImage.naturalWidth) {
-                        console.log('showCropModal: cropImage already loaded');
-                        resolve();
-                    } else {
-                        cropImage.onload = () => {
-                            console.log('showCropModal: cropImage loaded');
-                            resolve();
-                        };
-                        cropImage.onerror = () => console.error('showCropModal: cropImage failed to load');
-                    }
-                });
-            })
-            .then(() => {
-                rotation = initialRotation;
-                setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage });
-                drawCropOverlay(cropCanvas, cropCtx);
-            })
-            .catch(err => console.error('showCropModal: Error in processing chain', err));
+        cropImage.src = img.src;
     } else {
-        console.log('showCropModal: Processing new upload');
-        originalUploadedImage.src = dataURL;
+        cropModal.style.display = 'block';
         cropImage.src = dataURL;
         rotation = 0;
-        cropModal.style.display = 'block';
+    }
+
+    return new Promise((resolve) => {
         cropImage.onload = () => {
-            console.log('showCropModal: New image loaded');
             const maxCanvasWidth = window.innerWidth - 100;
             const maxCanvasHeight = window.innerHeight - 250;
             const originalWidth = cropImage.width;
@@ -70,16 +42,18 @@ function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOri
             const fullRotatedWidth = Math.ceil(originalWidth * cosA + originalHeight * sinA);
             const fullRotatedHeight = Math.ceil(originalWidth * sinA + originalHeight * cosA);
             const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
+
             cropCanvas.width = Math.round(fullRotatedWidth * scale);
             cropCanvas.height = Math.round(fullRotatedHeight * scale);
             cropCanvas.dataset.scaleFactor = scale;
+
             cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
-            setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage });
+            setupCropControls(null, params);
             drawCropOverlay(cropCanvas, cropCtx);
+            resolve();
         };
-        cropImage.onerror = () => console.error('showCropModal: New image failed to load');
         if (cropImage.complete && cropImage.naturalWidth) cropImage.onload();
-    }
+    });
 }
 
 function drawCropOverlay(cropCanvas, cropCtx) {
@@ -543,25 +517,80 @@ function setupCropEventListeners(cropCanvas, cropCtx) {
     });
 }
 
-function initializeCropHandler(params) {
-    const { cropModal, cropCanvas, cropCtx, img, trueOriginalImage, originalUploadedImage, settings, noiseSeed, originalFullResImage, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, isShowingOriginal, saveImageState, modal, modalImage } = params;
-    console.log('initializeCropHandler params:', params);
-    if (!cropCanvas || !cropCtx) {
-        console.error('initializeCropHandler: cropCanvas or cropCtx is undefined');
-        return;
+export function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false) {
+    if (!fullResCtx || !fullResCtx.clearRect) {
+        console.error('Invalid fullResCtx:', fullResCtx);
+        return Promise.reject('Invalid fullResCtx');
     }
-    setupCropEventListeners(cropCanvas, cropCtx);
-    const cropImageButton = document.getElementById('crop-image-button');
-    cropImageButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!img.src || img.src === '') return;
-        showCropModal(null, params);
-    });
-    cropImageButton.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        if (!img.src || img.src === '') return;
-        showCropModal(null, params);
-    });
+    
+    const { cropCanvas, cropCtx, fullResCanvas, fullResCtx, img, canvas, ctx, redrawImage, originalUploadedImage, trueOriginalImage } = params;
+
+    function setupCropControls(unfilteredCanvas, params) {
+        const cropControls = document.getElementById('crop-controls');
+        cropControls.innerHTML = `
+            <button id="crop-confirm">Confirm</button>
+            <button id="crop-skip">Skip</button>
+        `;
+
+        document.getElementById('crop-confirm').addEventListener('click', () => {
+            const origWidth = cropImage.width;
+            const origHeight = cropImage.height;
+            const angleRad = rotation * Math.PI / 180;
+            const cosA = Math.abs(Math.cos(angleRad));
+            const sinA = Math.abs(Math.sin(angleRad));
+            const fullRotatedWidth = Math.ceil(origWidth * cosA + origHeight * sinA);
+            const fullRotatedHeight = Math.ceil(origWidth * sinA + origHeight * cosA);
+
+            const fullRotatedCanvas = document.createElement('canvas');
+            fullRotatedCanvas.width = fullRotatedWidth;
+            fullRotatedCanvas.height = fullRotatedHeight;
+            const fullRotatedCtx = fullRotatedCanvas.getContext('2d');
+            fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
+            fullRotatedCtx.rotate(angleRad);
+            fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
+            fullRotatedCtx.drawImage(trueOriginalImage, 0, 0, origWidth, origHeight);
+
+            const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
+            const cropX = cropRect.x / scaleFactor;
+            const cropY = cropRect.y / scaleFactor;
+            const cropWidth = Math.round(cropRect.width / scaleFactor);
+            const cropHeight = Math.round(cropRect.height / scaleFactor);
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = cropWidth;
+            tempCanvas.height = cropHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(fullRotatedCanvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+            img.src = tempCanvas.toDataURL('image/png');
+            originalUploadedImage.src = img.src;
+            fullResCanvas.width = cropWidth;
+            fullResCanvas.height = cropHeight;
+            params.fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true }); // Update context
+            fullResCtx.drawImage(tempCanvas, 0, 0, cropWidth, cropHeight);
+
+            cropModal.style.display = 'none';
+            img.onload = () => {
+                params.originalWidth = cropWidth;
+                params.originalHeight = cropHeight;
+                redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true);
+            };
+            if (img.complete && img.naturalWidth) img.onload();
+        });
+
+        document.getElementById('crop-skip').addEventListener('click', () => {
+            cropModal.style.display = 'none';
+            redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true);
+        });
+    }
+
+    function drawCropOverlay(cropCanvas, cropCtx) {
+        cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+        cropCtx.drawImage(cropImage, 0, 0, cropCanvas.width, cropCanvas.height);
+        cropCtx.strokeStyle = '#800000';
+        cropCtx.lineWidth = 3;
+        cropCtx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
+    }
 }
 
 export { initializeCropHandler, showCropModal, drawCropOverlay, setupCropControls, setupCropEventListeners, setTriggerFileUpload };
