@@ -313,76 +313,6 @@ function setupCropControls() {
     const cropControls = document.getElementById('crop-controls');
     if (!cropControls) return;
 
-    cropControls.innerHTML = `
-        <div class="crop-control-group">
-            <label for="rotation">Rotación:</label>
-            <input type="range" id="rotation" min="-180" max="180" value="${rotation}">
-            <span id="rotation-value">${rotation}°</span>
-        </div>
-        <div class="crop-button-group">
-            <button id="crop-restore">Restaurar</button>
-            <button id="crop-upload">Subir Imagen</button>
-            <button id="crop-confirm">Continuar</button>
-            <button id="crop-skip">Omitir</button>
-        </div>
-        <div class="crop-lock-group">
-            <input type="checkbox" id="lock-aspect" ${lockAspectRatio ? 'checked' : ''}>
-            <label for="lock-aspect">Bloquear proporción</label>
-        </div>
-    `;
-
-    const rotationInput = document.getElementById('rotation');
-    const rotationValue = document.getElementById('rotation-value');
-    const restoreBtn = document.getElementById('crop-restore');
-    const uploadBtn = document.getElementById('crop-upload');
-    const confirmBtn = document.getElementById('crop-confirm');
-    const skipBtn = document.getElementById('crop-skip');
-    const lockCheckbox = document.getElementById('lock-aspect');
-
-    if (rotationInput) {
-        rotationInput.addEventListener('input', (e) => {
-            rotation = parseInt(e.target.value);
-            rotationValue.textContent = `${rotation}°`;
-            setupCropOverlay();
-        });
-    }
-
-    if (rotationValue) {
-        rotationValue.addEventListener('click', () => {
-            const newValue = prompt('Ingrese el ángulo de rotación (-180 a 180):', rotation);
-            if (newValue !== null) {
-                const parsedValue = parseInt(newValue);
-                if (!isNaN(parsedValue) && parsedValue >= -180 && parsedValue <= 180) {
-                    rotation = parsedValue;
-                    rotationInput.value = rotation;
-                    rotationValue.textContent = `${rotation}°`;
-                    setupCropOverlay();
-                }
-            }
-        });
-    }
-
-    const addButtonListener = (button, handler) => {
-        if (!button) return;
-        
-        button.addEventListener('click', (e) => {
-            e.preventDefault();
-            handler(e);
-        });
-
-        button.addEventListener('touchend', (e) => {
-            // Only prevent default for buttons
-            e.preventDefault();
-            handler(e);
-        });
-    };
-
-    // Add touch event listeners to cropCanvas
-    cropCanvas.addEventListener('touchstart', startCropDrag, { passive: true });
-    cropCanvas.addEventListener('touchmove', adjustCropDrag, { passive: false });
-    cropCanvas.addEventListener('touchend', stopCropDrag);
-    cropCanvas.addEventListener('touchcancel', stopCropDrag);
-
     // Add mouse event listeners to cropCanvas
     cropCanvas.addEventListener('mousedown', startCropDrag);
     cropCanvas.addEventListener('mousemove', (e) => {
@@ -394,34 +324,77 @@ function setupCropControls() {
     cropCanvas.addEventListener('mouseup', stopCropDrag);
     cropCanvas.addEventListener('mouseleave', stopCropDrag);
 
-    addButtonListener(uploadBtn, () => {
-        if (typeof triggerFileUpload === 'function') {
-            triggerFileUpload();
-        }
-    });
+    // Add touch event listeners with passive: false
+    cropCanvas.addEventListener('touchstart', startCropDrag, { passive: false });
+    cropCanvas.addEventListener('touchmove', adjustCropDrag, { passive: false });
+    cropCanvas.addEventListener('touchend', stopCropDrag, { passive: false });
+    cropCanvas.addEventListener('touchcancel', stopCropDrag, { passive: false });
 
-    addButtonListener(restoreBtn, () => {
-        rotation = initialRotation;
-        rotationInput.value = rotation;
-        rotationValue.textContent = `${rotation}°`;
-        cropRect = { ...initialCropRect };
-        setupCropOverlay();
-    });
+    // Add rotation controls
+    const rotateLeft = document.getElementById('rotate-left');
+    const rotateRight = document.getElementById('rotate-right');
+    
+    if (rotateLeft) {
+        rotateLeft.addEventListener('click', () => {
+            rotation = (rotation - 90) % 360;
+            drawCropOverlay();
+        });
+    }
+    
+    if (rotateRight) {
+        rotateRight.addEventListener('click', () => {
+            rotation = (rotation + 90) % 360;
+            drawCropOverlay();
+        });
+    }
 
-    addButtonListener(confirmBtn, () => {
-        applyCropChanges();
-    });
+    // Add aspect ratio controls
+    const aspectRatioFree = document.getElementById('aspect-ratio-free');
+    const aspectRatioSquare = document.getElementById('aspect-ratio-square');
+    const aspectRatio43 = document.getElementById('aspect-ratio-4-3');
+    const aspectRatio169 = document.getElementById('aspect-ratio-16-9');
+    
+    if (aspectRatioFree) {
+        aspectRatioFree.addEventListener('click', () => {
+            aspectRatio = 0;
+            drawCropOverlay();
+        });
+    }
+    
+    if (aspectRatioSquare) {
+        aspectRatioSquare.addEventListener('click', () => {
+            aspectRatio = 1;
+            drawCropOverlay();
+        });
+    }
+    
+    if (aspectRatio43) {
+        aspectRatio43.addEventListener('click', () => {
+            aspectRatio = 4/3;
+            drawCropOverlay();
+        });
+    }
+    
+    if (aspectRatio169) {
+        aspectRatio169.addEventListener('click', () => {
+            aspectRatio = 16/9;
+            drawCropOverlay();
+        });
+    }
 
-    addButtonListener(skipBtn, () => {
-        closeModal(cropModal);
-    });
-
-    if (lockCheckbox) {
-        lockCheckbox.addEventListener('change', (e) => {
-            lockAspectRatio = e.target.checked;
-            if (lockAspectRatio) {
-                aspectRatio = cropRect.width / cropRect.height;
-            }
+    // Add confirm and cancel buttons
+    const confirmCrop = document.getElementById('confirm-crop');
+    const cancelCrop = document.getElementById('cancel-crop');
+    
+    if (confirmCrop) {
+        confirmCrop.addEventListener('click', () => {
+            applyCropChanges();
+        });
+    }
+    
+    if (cancelCrop) {
+        cancelCrop.addEventListener('click', () => {
+            closeModal(cropModal);
         });
     }
 }

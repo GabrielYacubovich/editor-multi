@@ -1,19 +1,28 @@
-// script.js
+// Initialize UI elements
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const fullResCanvas = document.createElement('canvas');
 const fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
-const controls = document.querySelectorAll('.controls input');
-const undoButton = document.getElementById('undo-button');
-const redoButton = document.getElementById('redo-button');
-const restoreButton = document.getElementById('restore');
-const toggleOriginalButton = document.getElementById('toggle-original');
-const uploadNewPhotoButton = document.getElementById('upload-new-photo');
-const cropImageButton = document.getElementById('crop-image-button');
-const modal = document.getElementById('image-modal');
-const modalImage = document.getElementById('modal-image');
+const modal = document.getElementById('modal');
 const previewModal = document.getElementById('preview-modal');
 const downloadButton = document.getElementById('download');
+const undoButton = document.getElementById('undo-button');
+const redoButton = document.getElementById('redo-button');
+const controls = document.querySelectorAll('.controls input');
+const uploadNewPhotoButton = document.getElementById('upload-new-photo');
+const cropImageButton = document.getElementById('crop-image-button');
+const restoreButton = document.getElementById('restore');
+const toggleOriginalButton = document.getElementById('toggle-original');
+const modalImage = document.getElementById('modal-image');
+const cropModal = document.getElementById('crop-modal');
+const cropCanvas = document.getElementById('crop-canvas');
+const cropCtx = cropCanvas.getContext('2d');
+
+// Add event listeners for undo/redo
+if (undoButton && redoButton) {
+    undoButton.addEventListener('click', undoChange);
+    redoButton.addEventListener('click', redoChange);
+}
 
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
@@ -57,7 +66,6 @@ let isTriggering = false;
 let fileInput = null;
 
 let cropImage = new Image();
-let cropCanvas, cropCtx, cropModal;
 let rotation = 0;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
 let originalCropRect = { ...cropRect };
@@ -400,10 +408,6 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    cropCanvas = document.getElementById('crop-canvas');
-    cropCtx = cropCanvas.getContext('2d');
-    cropModal = document.getElementById('crop-modal');
-
     initializeCropHandler({
         cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx,
         img, trueOriginalImage, originalUploadedImage, originalFullResImage,
@@ -876,6 +880,3 @@ document.addEventListener('keydown', (e) => {
         redoChange();
     }
 });
-
-undoButton.addEventListener('click', undoChange);
-redoButton.addEventListener('click', redoChange);
