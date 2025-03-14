@@ -217,48 +217,47 @@ body {
 }
 
 /* Crop Modal */
+#crop-modal .modal-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    padding-top: 20px;
+}
+
 #crop-canvas {
     max-width: 100%;
     max-height: 70vh;
-    display: block;
     margin: 0 auto;
+    cursor: crosshair;
 }
 
 #crop-controls {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
+    width: 100%;
     max-width: 600px;
-    background-color: rgba(255, 255, 255, 0.95);
     padding: 15px;
+    background-color: #f5f5f5;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
 }
 
 .crop-control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 15px;
 }
 
 .crop-control-group label {
-    display: inline-block;
-    width: 80px;
-    margin-right: 10px;
-    font-size: 14px;
+    min-width: 80px;
 }
 
 .crop-control-group input[type="range"] {
-    width: calc(100% - 150px);
-    vertical-align: middle;
+    flex: 1;
 }
 
 .crop-control-group span {
-    display: inline-block;
-    width: 40px;
+    min-width: 50px;
     text-align: right;
-    font-size: 14px;
 }
 
 .crop-button-group {
@@ -273,7 +272,7 @@ body {
     background-color: #000;
     color: white;
     border: none;
-    border-radius: 20px;
+    border-radius: 19px;
     cursor: pointer;
     font-size: 14px;
     transition: background-color 0.2s;
@@ -283,44 +282,29 @@ body {
     background-color: #333;
 }
 
+#crop-upload {
+    background-color: rgb(20, 118, 74);
+}
+
+#crop-upload:hover {
+    background-color: rgb(16, 95, 59);
+}
+
 .crop-lock-group {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 10px;
 }
 
 .crop-lock-group input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-}
-
-.crop-lock-group label {
-    font-size: 14px;
+    width: 18px;
+    height: 18px;
     cursor: pointer;
 }
 
-#crop-canvas {
-    display: block;
-    max-width: 100%;
-    max-height: calc(90vh - 200px);
-    margin: 0 auto;
-    touch-action: none;
-}
-
-@media (max-width: 768px) {
-    #crop-controls {
-        padding: 10px;
-    }
-
-    .crop-button-group {
-        flex-wrap: wrap;
-    }
-
-    .crop-button-group button {
-        min-width: calc(50% - 5px);
-        font-size: 13px;
-    }
+.crop-lock-group label {
+    cursor: pointer;
+    user-select: none;
 }
 
 /* Preview Modal */
