@@ -475,7 +475,7 @@ downloadButton.addEventListener('click', () => {
     const fileTypeSelect = document.getElementById('save-file-type');
     const dimensionsSpan = document.getElementById('dimensions');
     const fileSizeSpan = document.getElementById('file-size');
-    const originalDataURL = originalUploadedImage.src; // Use originalUploadedImage for unedited case
+    const originalDataURL = originalUploadedImage.src || fullResCanvas.toDataURL('image/png'); // Fallback to fullResCanvas
 
     function updateFileInfo() {
         const scale = parseFloat(resolutionSelect.value) / 100;
@@ -488,7 +488,7 @@ downloadButton.addEventListener('click', () => {
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-        tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
+        tempCtx.drawImage(fullResCanvas, 0, 0, width, height); // Use fullResCanvas for consistency
         const fileType = fileTypeSelect.value;
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
@@ -509,15 +509,18 @@ downloadButton.addEventListener('click', () => {
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
 
-        if (!img.complete || img.naturalWidth === 0) {
-            console.error("Image not loaded for download:", img);
-            alert("Cannot download: Image is not loaded.");
+        // Check if fullResCanvas has valid content
+        if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
+            console.error("No valid image data available for download. Please upload an image first.");
+            alert("No image available to download. Please upload an image.");
+            document.body.removeChild(popup);
+            document.body.removeChild(overlay);
             return;
         }
 
         showLoadingIndicator(true);
-        const width = Math.round((originalWidth || img.width) * scale);
-        const height = Math.round((originalHeight || img.height) * scale);
+        const width = Math.round((originalWidth || fullResCanvas.width) * scale);
+        const height = Math.round((originalHeight || fullResCanvas.height) * scale);
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
         tempCanvas.height = height;
@@ -525,7 +528,7 @@ downloadButton.addEventListener('click', () => {
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
 
-        if (!isEdited && scale === 1.0) {
+        if (!isEdited && scale === 1.0 && originalUploadedImage.complete && originalUploadedImage.naturalWidth !== 0) {
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
             link.href = originalDataURL;
@@ -536,8 +539,10 @@ downloadButton.addEventListener('click', () => {
             return;
         }
 
+        // Ensure img is loaded or use fullResCanvas directly
+        const sourceImage = (img.complete && img.naturalWidth !== 0) ? img : fullResCanvas;
         redrawImage(
-            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            ctx, canvas, fullResCanvas, fullResCtx, sourceImage, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
         ).then(() => {
             tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
