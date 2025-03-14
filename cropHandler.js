@@ -16,8 +16,9 @@ function setTriggerFileUpload(fn) {
     triggerFileUpload = fn;
 }
 
-function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, initialRotation, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState }) {
+function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, initialRotation, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage }) {
     if (!dataURL) {
+        console.log('showCropModal: Processing existing image');
         cropModal.style.display = 'block';
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = trueOriginalImage.width;
@@ -29,23 +30,36 @@ function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOri
             .then(() => applyGlitchEffects(tempCtx, tempCanvas, settings, noiseSeed, 1))
             .then(() => applyComplexFilters(tempCtx, tempCanvas, settings, noiseSeed, 1))
             .then(() => {
-                cropImage.src = tempCanvas.toDataURL('image/png');
+                const dataURL = tempCanvas.toDataURL('image/png');
+                console.log('showCropModal: Setting cropImage.src', dataURL.substring(0, 50));
+                cropImage.src = dataURL;
                 return new Promise(resolve => {
-                    if (cropImage.complete && cropImage.naturalWidth) resolve();
-                    else cropImage.onload = resolve;
+                    if (cropImage.complete && cropImage.naturalWidth) {
+                        console.log('showCropModal: cropImage already loaded');
+                        resolve();
+                    } else {
+                        cropImage.onload = () => {
+                            console.log('showCropModal: cropImage loaded');
+                            resolve();
+                        };
+                        cropImage.onerror = () => console.error('showCropModal: cropImage failed to load');
+                    }
                 });
             })
             .then(() => {
                 rotation = initialRotation;
-                setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState });
+                setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage });
                 drawCropOverlay(cropCanvas, cropCtx);
-            });
+            })
+            .catch(err => console.error('showCropModal: Error in processing chain', err));
     } else {
+        console.log('showCropModal: Processing new upload');
         originalUploadedImage.src = dataURL;
         cropImage.src = dataURL;
         rotation = 0;
         cropModal.style.display = 'block';
         cropImage.onload = () => {
+            console.log('showCropModal: New image loaded');
             const maxCanvasWidth = window.innerWidth - 100;
             const maxCanvasHeight = window.innerHeight - 250;
             const originalWidth = cropImage.width;
@@ -60,9 +74,10 @@ function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOri
             cropCanvas.height = Math.round(fullRotatedHeight * scale);
             cropCanvas.dataset.scaleFactor = scale;
             cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
-            setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState });
+            setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage });
             drawCropOverlay(cropCanvas, cropCtx);
         };
+        cropImage.onerror = () => console.error('showCropModal: New image failed to load');
         if (cropImage.complete && cropImage.naturalWidth) cropImage.onload();
     }
 }
@@ -118,16 +133,9 @@ function drawCropOverlay(cropCanvas, cropCtx) {
     cropCtx.setLineDash([5, 5]);
     cropCtx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
     cropCtx.setLineDash([]);
-
-    if (isDragging) {
-        cropRect.x = clamp(cropRect.x, 0, cropCanvas.width - cropRect.width);
-        cropRect.y = clamp(cropRect.y, 0, cropCanvas.height - cropRect.height);
-        cropRect.width = clamp(cropRect.width, 10, cropCanvas.width - cropRect.x);
-        cropRect.height = clamp(cropRect.height, 10, cropCanvas.height - cropRect.y);
-    }
 }
 
-function setupCropControls(unfilteredCanvas, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState }) {
+function setupCropControls(unfilteredCanvas, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage }) {
     const cropControls = document.getElementById('crop-controls');
     cropControls.innerHTML = `
         <div class="crop-control-group">
@@ -536,8 +544,8 @@ function setupCropEventListeners(cropCanvas, cropCtx) {
 }
 
 function initializeCropHandler(params) {
-    const { cropModal, cropCanvas, cropCtx, img, trueOriginalImage, originalUploadedImage, settings, noiseSeed, originalFullResImage, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, isShowingOriginal, saveImageState } = params;
-    console.log('initializeCropHandler params:', { cropCanvas, cropCtx });
+    const { cropModal, cropCanvas, cropCtx, img, trueOriginalImage, originalUploadedImage, settings, noiseSeed, originalFullResImage, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, isShowingOriginal, saveImageState, modal, modalImage } = params;
+    console.log('initializeCropHandler params:', params);
     if (!cropCanvas || !cropCtx) {
         console.error('initializeCropHandler: cropCanvas or cropCtx is undefined');
         return;

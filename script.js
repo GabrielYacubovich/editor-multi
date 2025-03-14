@@ -77,7 +77,7 @@ function triggerFileUpload() {
                     cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, 
                     settings, noiseSeed, initialRotation: 0, img, canvas, fullResCanvas, fullResCtx, 
                     originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, 
-                    originalFullResImage, isShowingOriginal, saveImageState
+                    originalFullResImage, isShowingOriginal, saveImageState, modal, modalImage
                 });
             };
             cleanupFileInput();
@@ -545,20 +545,6 @@ function addButtonListeners(button, handler) {
 addButtonListeners(undoButton, debouncedUndo);
 addButtonListeners(redoButton, debouncedRedo);
 
-cropImageButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    if (!img.src || img.src === '') return;
-    showCropModal();
-});
-
-cropImageButton.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    if (!img.src || img.src === "") {
-        console.error("No image source available to crop");
-        return;
-    }
-    showCropModal(img.src); // Pass img.src
-});
 
 restoreButton.addEventListener('click', () => {
     settings = {
