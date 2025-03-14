@@ -6,10 +6,12 @@ import { clamp } from './utils.js';
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-    uploadNewPhotoButton, saveImageState, originalImageData; // Add originalImageData here
+    uploadNewPhotoButton, saveImageState;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
-let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
-let initialRotation = 0;
+let initialCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Last confirmed state
+let initialRotation = 0; // Last confirmed rotation
+let originalCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Original uploaded state
+let originalRotation = 0; // Original uploaded rotation (typically 0)
 let rotation = 0;
 let isDragging = false;
 let startX, startY;
@@ -26,60 +28,38 @@ export function initializeCropHandler(options) {
     setupModal(cropModal, false);
 }
 
-export function showCropModal(dataURL = null) {
-    cropModal.style.display = 'block';
-    
-    if (!dataURL) {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = trueOriginalImage.width;
-        tempCanvas.height = trueOriginalImage.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(trueOriginalImage, 0, 0);
-        applyBasicFiltersManually(tempCtx, tempCanvas, settings);
-        return applyAdvancedFilters(tempCtx, tempCanvas, settings, noiseSeed, 1)
-            .then(() => applyGlitchEffects(tempCtx, tempCanvas, settings, noiseSeed, 1))
-            .then(() => applyComplexFilters(tempCtx, tempCanvas, settings, noiseSeed, 1))
-            .then(() => {
-                cropImage.src = tempCanvas.toDataURL('image/png');
-                return new Promise((resolve) => {
-                    if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
-                    else cropImage.onload = resolve;
-                }).then(() => {
-                    rotation = initialRotation;
-                    setupCropControls(null);
-                    drawCropOverlay();
-                });
-            });
-    } else {
-        originalUploadedImage.src = dataURL;
-        cropImage.src = dataURL;
-        return new Promise((resolve) => {
-            if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
-            else cropImage.onload = resolve;
-        }).then(() => {
-            rotation = 0;
-            initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
-            initialRotation = 0;
-            
-            const maxCanvasWidth = window.innerWidth - 100;
-            const maxCanvasHeight = window.innerHeight - 250;
-            const originalWidth = cropImage.width;
-            const originalHeight = cropImage.height;
-            const angleRad = rotation * Math.PI / 180;
-            const cosA = Math.abs(Math.cos(angleRad));
-            const sinA = Math.abs(Math.sin(angleRad));
-            const fullRotatedWidth = Math.ceil(originalWidth * cosA + originalHeight * sinA);
-            const fullRotatedHeight = Math.ceil(originalWidth * sinA + originalHeight * cosA);
-            const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
-            cropCanvas.width = Math.round(fullRotatedWidth * scale);
-            cropCanvas.height = Math.round(fullRotatedHeight * scale);
-            cropCanvas.dataset.scaleFactor = scale;
-            cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
-            
-            setupCropControls(null);
-            drawCropOverlay();
-        });
-    }
+export function showCropModal(imageSrc) {
+    cropImage.src = imageSrc;
+    cropImage.onload = () => {
+        const displayWidth = Math.min(cropImage.width, window.innerWidth * 0.8);
+        const displayHeight = Math.min(cropImage.height, window.innerHeight * 0.8 - 100);
+        const scale = Math.min(displayWidth / cropImage.width, displayHeight / cropImage.height);
+        const canvasWidth = cropImage.width * scale;
+        const canvasHeight = cropImage.height * scale;
+
+        cropCanvas.width = canvasWidth;
+        cropCanvas.height = canvasHeight;
+        cropCanvas.dataset.scaleFactor = scale;
+
+        // Set original state (full image, no rotation)
+        originalCropRect = { x: 0, y: 0, width: cropImage.width, height: cropImage.height };
+        originalRotation = 0;
+
+        // Set initial crop rect (can be adjusted later)
+        cropRect = {
+            x: canvasWidth * 0.1,
+            y: canvasHeight * 0.1,
+            width: canvasWidth * 0.8,
+            height: canvasHeight * 0.8
+        };
+        initialCropRect = { ...cropRect }; // Initial state matches first display
+        initialRotation = 0;
+
+        rotation = 0;
+        drawCropImage();
+        openModal(cropModal);
+        setupCropControls();
+    };
 }
 
 function setupCropControls(unfilteredCanvas) {
@@ -135,8 +115,12 @@ function setupCropControls(unfilteredCanvas) {
         e.preventDefault();
         triggerFileUpload();
     });
-    restoreBtn.addEventListener('click', () => {
-        if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+    restoreBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        rotation = originalRotation; // Reset to original rotation (0)
+        cropRect = { ...originalCropRect }; // Reset to original full image
+        drawCropImage();
+                if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
             console.error("Restore failed: trueOriginalImage is not loaded", trueOriginalImage);
             return;
         }
@@ -293,6 +277,7 @@ function setupCropControls(unfilteredCanvas) {
             canvas.style.display = 'block'; // Show on error
         };
     
+        // Update last confirmed state, not original state
         initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
         initialRotation = rotation;
     });
