@@ -2,6 +2,7 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
+import { initializeHistory } from './history.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -65,6 +66,9 @@ const state = {
         exposure: 100,
         temperature: 100,
         saturation: 100,
+        history: [],
+    redoHistory: [],
+    lastAppliedEffect: null,
         'glitch-chromatic': 0,
         'glitch-rgb-split': 0,
         'glitch-chromatic-vertical': 0,
@@ -75,9 +79,10 @@ const state = {
         'kaleidoscope-offset': 0,
         'vortex-twist': 0,
         'edge-detect': 0
+        
     },
     fullResCanvas: document.createElement('canvas'),
-    fullResCtx: null, // Will be set after initialization
+    fullResCtx: null,
     originalWidth: 0,
     originalHeight: 0,
     noiseSeed: Math.random(),
@@ -85,10 +90,13 @@ const state = {
     trueOriginalImage: new Image(),
     modal: document.getElementById('image-modal'),
     modalImage: document.getElementById('modal-image'),
-    // Add other properties as needed from other modules
+    history: [],
+    redoHistory: [],
+    lastAppliedEffect: null,
 };
 
 // Initialize fullResCtx
+initializeHistory(state);
 state.fullResCtx = state.fullResCanvas.getContext('2d');
 let history = [{ filters: { ...settings }, imageData: null }];
 let redoHistory = [];
@@ -97,6 +105,30 @@ let originalWidth, originalHeight, previewWidth, previewHeight;
 
 let isTriggering = false;
 let fileInput = null;
+state.img.onload = () => {
+    state.originalWidth = state.img.width;
+    state.originalHeight = state.img.height;
+    state.fullResCanvas.width = state.originalWidth;
+    state.fullResCanvas.height = state.originalHeight;
+    state.fullResCtx.drawImage(state.img, 0, 0, state.originalWidth, state.originalHeight);
+
+    // Set canvas preview size (simplified from all-in-one)
+    const maxWidth = Math.min(1920, window.innerWidth - 100);
+    const maxHeight = window.innerHeight - 250;
+    const ratio = state.originalWidth / state.originalHeight;
+    state.canvas.width = ratio > 1 ? Math.min(maxWidth, state.originalWidth) : maxHeight * ratio;
+    state.canvas.height = ratio > 1 ? state.canvas.width / ratio : Math.min(maxHeight, state.originalHeight);
+
+    redrawImage(state, true)
+        .then(() => {
+            state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
+        })
+        .catch(err => console.error('Initial redraw failed:', err));
+};
+
+// Trigger initial file upload or use a default image if needed
+uploadNewPhotoButton.addEventListener('click', triggerFileUpload); // Ensure this sets state.img.src
+
 
 function triggerFileUpload() {
     isTriggering = true;

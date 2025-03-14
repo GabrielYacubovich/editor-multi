@@ -1,4 +1,10 @@
 import { showLoadingIndicator } from './domUtils.js';
+import { saveImageState } from './history.js';
+import { applyBasicFiltersManually } from './filters.js'; // Adjust path as needed
+import { applyAdvancedFilters } from './advancedFilters.js';
+import { applyGlitchEffects } from './glitchEffects.js';
+import { applyComplexFilters } from './complexFilters.js';
+import { saveImageState } from './history.js';
 
 // Basic Filters (unchanged, matches old behavior)
 function applyBasicFiltersManually(ctx, canvas, settings) {
@@ -355,23 +361,20 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 
 // Redraw Image (unchanged, works with updated filters)
 export function redrawImage(state, saveState = false) {
-    showLoadingIndicator(true);
-    if (!state.fullResCanvas) {
-        console.error('fullResCanvas is undefined');
+    if (!state.fullResCanvas || !state.fullResCtx || !state.img || !state.originalWidth || !state.originalHeight) {
+        console.error('Required state properties missing:', {
+            fullResCanvas: !!state.fullResCanvas,
+            fullResCtx: !!state.fullResCtx,
+            img: !!state.img,
+            originalWidth: state.originalWidth,
+            originalHeight: state.originalHeight
+        });
         showLoadingIndicator(false);
-        return Promise.reject('Canvas not initialized');
+        return Promise.reject('Invalid state for redraw');
     }
+    showLoadingIndicator(true);
     state.fullResCanvas.width = state.originalWidth;
     state.fullResCanvas.height = state.originalHeight;
-
-    if (state.fullResCanvas.width === 0 || state.fullResCanvas.height === 0) {
-        showLoadingIndicator(false);
-        return Promise.reject("Invalid canvas dimensions");
-    }
-
-    const fullResCtx = state.fullResCanvas.getContext('2d');
-    fullResCtx.clearRect(0, 0, state.fullResCanvas.width, state.fullResCanvas.height);
-    fullResCtx.drawImage(state.img, 0, 0, state.originalWidth, state.originalHeight);
 
     applyBasicFiltersManually(fullResCtx, state.fullResCanvas, state.settings); // Ensure this is imported
     const scaleFactor = 1;
@@ -398,8 +401,8 @@ export function redrawImage(state, saveState = false) {
             if (state.modal.style.display === 'block') {
                 state.modalImage.src = state.canvas.toDataURL('image/png');
             }
-            if (saveState) saveImageState(state); // Ensure this is imported or defined
-            showLoadingIndicator(false);
+            if (saveState) saveImageState(state);
+    showLoadingIndicator(false);
         })
         .catch(err => {
             console.error('Redraw error:', err);
