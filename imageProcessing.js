@@ -1,6 +1,5 @@
 // imageProcessing.js
 import { showLoadingIndicator } from './domUtils.js';
-import { clamp } from './utils.js';
 
 // Basic Filters
 export function applyBasicFiltersManually(ctx, canvas, settings) {
@@ -30,8 +29,10 @@ export function applyBasicFiltersManually(ctx, canvas, settings) {
             const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
             r = r * (1 - grayscale) + gray * grayscale;
             g = g * (1 - grayscale) + gray * grayscale;
+            b = b * (1 - grayscale) + gray * grayscale; // Fixed missing b assignment
+        }
 
-        r = clamp(r, 0, 255);
+        r = clamp(r, 0, 255); // Clamp after grayscale
         g = clamp(g, 0, 255);
         b = clamp(b, 0, 255);
 
@@ -57,7 +58,6 @@ export function applyBasicFiltersManually(ctx, canvas, settings) {
         data[i + 2] = clamp(b, 0, 255);
     }
     ctx.putImageData(imageData, 0, 0);
-}
 }
 
 // Advanced Filters
@@ -395,7 +395,7 @@ export function redrawImage(
                 ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
             }
-            if (modal.style.display === 'block') {
+            if (modal && modal.style.display === 'block') {
                 modalImage.src = canvas.toDataURL('image/png');
             }
             if (saveState && saveImageStateCallback) {
