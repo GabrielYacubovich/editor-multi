@@ -236,7 +236,7 @@ img.onload = function () {
         canvas.style.display = 'block';
     });
 };
-let redrawWorker;
+export let redrawWorker;
 if (window.Worker) {
     redrawWorker = new Worker(URL.createObjectURL(new Blob([`
         // Inline functions from imageProcessing.js

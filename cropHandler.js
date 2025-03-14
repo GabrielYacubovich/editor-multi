@@ -2,6 +2,7 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { clamp, debounce } from './utils.js';
+import { redrawWorker } from './script.js'; // Add this import
 
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
@@ -182,8 +183,10 @@ function setupCropControls() {
             return;
         }
         closeModal(cropModal);
-        let origWidth = cropImage.width;
-        let origHeight = cropImage.height;
+        showLoadingIndicator(true); // Show loading while processing
+    
+        const origWidth = cropImage.width;
+        const origHeight = cropImage.height;
         const angleRad = rotation * Math.PI / 180;
         const cosA = Math.abs(Math.cos(angleRad));
         const sinA = Math.abs(Math.sin(angleRad));
@@ -200,6 +203,7 @@ function setupCropControls() {
         fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
         const sourceImage = trueOriginalImage;
         fullRotatedCtx.drawImage(sourceImage, 0, 0, origWidth, origHeight);
+    
         const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
         const cropX = cropRect.x / scaleFactor;
         const cropY = cropRect.y / scaleFactor;
@@ -220,31 +224,44 @@ function setupCropControls() {
         if (redrawWorker) {
             const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
             redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
+            // Loading indicator is hidden by redrawWorker.onmessage in script.js
         } else {
-            img.src = tempCanvas.toDataURL('image/png');
-            originalUploadedImage.src = img.src;
-            trueOriginalImage.src = img.src;
-            trueOriginalImage.onload = () => {
-                originalWidth = cropWidth;
-                originalHeight = cropHeight;
-                fullResCanvas.width = originalWidth;
-                fullResCanvas.height = originalHeight;
-                fullResCtx.drawImage(tempCanvas, 0, 0);
-                canvas.width = Math.round(previewWidth);
-                canvas.height = Math.round(previewHeight);
-                redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState)
-                    .then(() => {
-                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                        canvas.style.display = 'block';
-                    });
-            };
+            // Fallback: Use requestAnimationFrame to split work
+            requestAnimationFrame(() => {
+                img.src = tempCanvas.toDataURL('image/png');
+                originalUploadedImage.src = img.src;
+                trueOriginalImage.src = img.src;
+                trueOriginalImage.onload = () => {
+                    originalWidth = cropWidth;
+                    originalHeight = cropHeight;
+                    fullResCanvas.width = originalWidth;
+                    fullResCanvas.height = originalHeight;
+                    fullResCtx.drawImage(tempCanvas, 0, 0);
+                    canvas.width = Math.round(previewWidth);
+                    canvas.height = Math.round(previewHeight);
+                    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState)
+                        .then(() => {
+                            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                            canvas.style.display = 'block';
+                            showLoadingIndicator(false);
+                        })
+                        .catch(err => {
+                            console.error("Redraw failed in fallback:", err);
+                            canvas.style.display = 'block';
+                            showLoadingIndicator(false);
+                        });
+                };
+            });
         }
     
         initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
         initialRotation = rotation;
     });
-
-    const debouncedConfirmClick = debounce(() => confirmBtn.click(), 200);
+    
+    const debouncedConfirmClick = debounce(() => {
+        confirmBtn.click(); // Minimal work here
+    }, 100);
+    
     confirmBtn.addEventListener('touchend', (e) => {
         e.preventDefault();
         debouncedConfirmClick();
