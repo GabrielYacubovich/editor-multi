@@ -6,7 +6,7 @@ import { clamp } from './utils.js';
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-    uploadNewPhotoButton;
+    uploadNewPhotoButton, saveImageState; // Add saveImageState here
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
 let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
 let initialRotation = 0;
@@ -22,7 +22,7 @@ export function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-       previewWidth, previewHeight, uploadNewPhotoButton } = options);
+       previewWidth, previewHeight, uploadNewPhotoButton, saveImageState } = options); // Add saveImageState
     setupModal(cropModal, false);
 }
 
@@ -273,7 +273,7 @@ function setupCropControls(unfilteredCanvas) {
     
             redrawImage(
                 ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState // Use the passed saveImageState
             ).then(() => {
                 originalFullResImage.src = fullResCanvas.toDataURL('image/png');
                 const tempCanvasForOriginal = document.createElement('canvas');
