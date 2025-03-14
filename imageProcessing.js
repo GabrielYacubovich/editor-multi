@@ -359,13 +359,6 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 }
 
 // Redraw Image
-javascript
-
-Collapse
-
-Wrap
-
-Copy
 function redrawImage(
     ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
     isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
