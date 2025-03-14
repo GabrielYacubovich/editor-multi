@@ -228,6 +228,7 @@ function setupCropControls(unfilteredCanvas) {
             cropX, cropY, cropWidth, cropHeight,
             0, 0, cropWidth, cropHeight
         );
+        canvas.style.display = 'none'; // Hide before setting img.src
         img.src = tempCanvas.toDataURL('image/png');
         originalUploadedImage.src = tempCanvas.toDataURL('image/png');
         trueOriginalImage.src = tempCanvas.toDataURL('image/png'); // Sync trueOriginalImage
@@ -276,9 +277,10 @@ function setupCropControls(unfilteredCanvas) {
                 isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
             ).then(() => {
                 originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                // Remove originalImageData update; let img.onload in script.js handle it
+                canvas.style.display = 'block'; // Show after render
             }).catch(err => {
                 console.error("Redraw after crop failed:", err);
+                canvas.style.display = 'block'; // Show even on error
             }).finally(() => {
                 closeModal(cropModal);
                 if (uploadNewPhotoButton) uploadNewPhotoButton.style.display = 'block';
@@ -288,6 +290,7 @@ function setupCropControls(unfilteredCanvas) {
         trueOriginalImage.onerror = () => {
             console.error("Failed to load trueOriginalImage after crop:", trueOriginalImage.src);
             closeModal(cropModal);
+            canvas.style.display = 'block'; // Show on error
         };
     
         initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };

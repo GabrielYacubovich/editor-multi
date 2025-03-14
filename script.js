@@ -237,11 +237,12 @@ img.onload = function () {
         originalImageData = tempCtx.getImageData(0, 0, previewWidth, previewHeight);
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         uploadNewPhotoButton.style.display = 'block';
+        canvas.style.display = 'block'; // Show canvas after render
     }).catch(err => {
         console.error("Failed to redraw image on load:", err);
+        canvas.style.display = 'block'; // Show even on error to avoid infinite hide
     });
 };
-
 let filterWorker;
 if (window.Worker) {
     filterWorker = new Worker(URL.createObjectURL(new Blob([`
@@ -592,33 +593,7 @@ restoreButton.addEventListener('click', () => {
     }
 });
 
-if (img.complete && img.naturalWidth !== 0) {
-    redrawImage(
-        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-    )
-        .then(() => {
-            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-        })
-        .finally(() => {
-            closeModal(cropModal);
-            uploadNewPhotoButton.style.display = 'block';
-        });
-} else {
-    img.onload = () => {
-        redrawImage(
-            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-        )
-            .then(() => {
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-            })
-            .finally(() => {
-                closeModal(cropModal);
-                uploadNewPhotoButton.style.display = 'block';
-            });
-    };
-}
+
 
 let isDraggingSlider = false;
 let tempSettings = {};
