@@ -1,4 +1,6 @@
 // cropHandler.js
+import { state } from './script.js';
+import { redrawImage } from './imageProcessing.js';
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 
@@ -207,9 +209,12 @@ function setupCropControls(unfilteredCanvas) {
     confirmBtn.addEventListener('click', (e) => {
         e.preventDefault();
         closeModal(cropModal);
-        let origWidth = cropImage.width;
-        let origHeight = cropImage.height;
-        if (origWidth === 0 || origHeight === 0) return;
+        const origWidth = cropImage.width;
+        const origHeight = cropImage.height;
+        if (origWidth === 0 || origHeight === 0) {
+            closeModal(cropModal);
+            return;
+        }
         const angleRad = rotation * Math.PI / 180;
         const cosA = Math.abs(Math.cos(angleRad));
         const sinA = Math.abs(Math.sin(angleRad));
@@ -232,16 +237,24 @@ function setupCropControls(unfilteredCanvas) {
         const cropWidth = Math.round(cropRect.width / scaleFactor);
         const cropHeight = Math.round(cropRect.height / scaleFactor);
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = cropWidth;
-        tempCanvas.height = cropHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.imageSmoothingEnabled = true;
-        tempCtx.imageSmoothingQuality = 'high';
-        tempCtx.drawImage(
-            fullRotatedCanvas,
-            cropX, cropY, cropWidth, cropHeight,
-            0, 0, cropWidth, cropHeight
-        );
+    tempCanvas.width = cropWidth;
+    tempCanvas.height = cropHeight;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.imageSmoothingEnabled = true;
+    tempCtx.imageSmoothingQuality = 'high';
+    tempCtx.drawImage(
+        fullRotatedCanvas,
+        cropX, cropY, cropWidth, cropHeight,
+        0, 0, cropWidth, cropHeight
+    );
+    // Update state with the cropped image
+    state.img.src = tempCanvas.toDataURL('image/png');
+    state.originalWidth = cropWidth;
+    state.originalHeight = cropHeight;
+    state.fullResCanvas.width = cropWidth;
+    state.fullResCanvas.height = cropHeight;
+    state.fullResCtx.drawImage(tempCanvas, 0, 0, cropWidth, cropHeight);
+    
         img.src = tempCanvas.toDataURL('image/png');
         originalUploadedImage.src = tempCanvas.toDataURL('image/png');
         originalWidth = tempCanvas.width;
@@ -298,23 +311,18 @@ function setupCropControls(unfilteredCanvas) {
             }
             canvas.width = Math.round(previewWidth);
             canvas.height = Math.round(previewHeight);
-            redrawImage(
-                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                isShowingOriginal, trueOriginalImage, modal, modalImage, true
-            ).then(() => {
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-            }).finally(() => {
-                closeModal(cropModal);
-                if (uploadNewPhotoButton) { // Check if defined
-                    uploadNewPhotoButton.style.display = 'block';
-                } else {
-                    console.warn("uploadNewPhotoButton is not defined in confirmBtn listener");
-                }
-            });
-        }).catch(err => {
-            console.error("Image load failed:", err);
+            redrawImage(state, true)
+        .then(() => {
+            state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
+        })
+        .catch(err => {
+            console.error('Image load failed:', err);
+        })
+        .finally(() => {
             closeModal(cropModal);
+            uploadNewPhotoButton.style.display = 'block';
         });
+});
     });
     confirmBtn.addEventListener('touchend', (e) => {
         e.preventDefault();

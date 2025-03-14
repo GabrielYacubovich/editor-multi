@@ -4,12 +4,12 @@ import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, ap
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
 
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const ctx = canvas.getContext('2d');
+const downloadButton = document.getElementById('download');
 const controls = document.querySelectorAll('.controls input');
 const undoButton = document.getElementById('undo');
 const redoButton = document.getElementById('redo');
 const restoreButton = document.getElementById('restore');
-const downloadButton = document.getElementById('download');
 const cropImageButton = document.getElementById('crop-image-button');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
 const toggleOriginalButton = document.getElementById('toggle-original');
@@ -50,6 +50,46 @@ let settings = {
     'vortex-twist': 0,
     'edge-detect': 0
 };
+const state = {
+    canvas,
+    ctx,
+    img: new Image(),
+    settings: {
+        brightness: 100,
+        contrast: 100,
+        grayscale: 0,
+        vibrance: 100,
+        highlights: 100,
+        shadows: 100,
+        noise: 0,
+        exposure: 100,
+        temperature: 100,
+        saturation: 100,
+        'glitch-chromatic': 0,
+        'glitch-rgb-split': 0,
+        'glitch-chromatic-vertical': 0,
+        'glitch-chromatic-diagonal': 0,
+        'glitch-pixel-shuffle': 0,
+        'glitch-wave': 0,
+        'kaleidoscope-segments': 0,
+        'kaleidoscope-offset': 0,
+        'vortex-twist': 0,
+        'edge-detect': 0
+    },
+    fullResCanvas: document.createElement('canvas'),
+    fullResCtx: null, // Will be set after initialization
+    originalWidth: 0,
+    originalHeight: 0,
+    noiseSeed: Math.random(),
+    isShowingOriginal: false,
+    trueOriginalImage: new Image(),
+    modal: document.getElementById('image-modal'),
+    modalImage: document.getElementById('modal-image'),
+    // Add other properties as needed from other modules
+};
+
+// Initialize fullResCtx
+state.fullResCtx = state.fullResCanvas.getContext('2d');
 let history = [{ filters: { ...settings }, imageData: null }];
 let redoHistory = [];
 let lastAppliedEffect = null;
@@ -790,3 +830,4 @@ initialize();
 
 
 
+export { state };

@@ -355,7 +355,12 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 
 // Redraw Image (unchanged, works with updated filters)
 export function redrawImage(state, saveState = false) {
-    showLoadingIndicator(true); // Assuming this is imported or available
+    showLoadingIndicator(true);
+    if (!state.fullResCanvas) {
+        console.error('fullResCanvas is undefined');
+        showLoadingIndicator(false);
+        return Promise.reject('Canvas not initialized');
+    }
     state.fullResCanvas.width = state.originalWidth;
     state.fullResCanvas.height = state.originalHeight;
 
