@@ -544,13 +544,13 @@ function addButtonListeners(button, handler) {
         e.preventDefault();
         e.stopPropagation();
         handler(e);
-    });
+    }, { passive: false });
     button.addEventListener('touchend', (e) => {
         e.preventDefault();
         e.stopPropagation();
         handler(e);
-    });
-    button.addEventListener('touchmove', (e) => e.preventDefault());
+    }, { passive: false });
+    button.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 }
 
 addButtonListeners(undoButton, debouncedUndo);
@@ -640,11 +640,11 @@ if (img.complete && img.naturalWidth !== 0) {
 let isDraggingSlider = false;
 let tempSettings = {};
 controls.forEach(control => {
-    control.addEventListener('mousedown', () => {
+    control.addEventListener('touchstart', () => {
         isDraggingSlider = true;
         tempSettings = { ...settings };
-    });
-    control.addEventListener('touchstart', () => {
+    }, { passive: true });
+    control.addEventListener('mousedown', () => {
         isDraggingSlider = true;
         tempSettings = { ...settings };
     });

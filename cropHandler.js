@@ -563,10 +563,11 @@ export function setupCropEventListeners() {
     cropCanvas.addEventListener('mousedown', startCropDrag);
     cropCanvas.addEventListener('mousemove', adjustCropDrag);
     cropCanvas.addEventListener('mouseup', stopCropDrag);
-    cropCanvas.addEventListener('touchstart', startCropDrag);
-    cropCanvas.addEventListener('touchmove', adjustCropDrag);
+    cropCanvas.addEventListener('touchstart', startCropDrag, { passive: false });
+    cropCanvas.addEventListener('touchmove', adjustCropDrag, { passive: false });
     cropCanvas.addEventListener('touchend', stopCropDrag);
     cropCanvas.addEventListener('mouseleave', (e) => {
+        if (isDragging) stopCropDrag(e);
         if (isDragging) stopCropDrag(e);
     });
     cropCanvas.addEventListener('mousemove', (e) => {
