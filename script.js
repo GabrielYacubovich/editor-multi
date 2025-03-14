@@ -1,10 +1,10 @@
 // script.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
-import { redrawImage } from './imageProcessing.js';
-import { initializeCropHandler, showCropModal, setTriggerFileUpload } from './cropHandler.js';
+import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
+import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
 
-let canvas = document.getElementById('canvas');
-let ctx = canvas.getContext('2d');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const controls = document.querySelectorAll('.controls input');
 const undoButton = document.getElementById('undo');
 const redoButton = document.getElementById('redo');
@@ -28,7 +28,6 @@ let isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
 let trueOriginalImage = new Image();
-
 let settings = {
     brightness: 100,
     contrast: 100,
@@ -58,26 +57,35 @@ let originalWidth, originalHeight, previewWidth, previewHeight;
 
 let isTriggering = false;
 let fileInput = null;
-function updateFullResContext() {
-    fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
-    if (!fullResCtx) {
-        console.error('Failed to initialize fullResCtx');
-    }
-}function triggerFileUpload() {
-    const fileInput = document.createElement('input');
+
+function triggerFileUpload() {
+    isTriggering = true;
+    fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
-    fileInput.onchange = (e) => {
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            originalUploadedImage.src = event.target.result;
-            showCropModal(event.target.result, { cropCanvas, cropCtx, fullResCanvas, fullResCtx, img, canvas, ctx });
+            trueOriginalImage.onload = () => { // Ensure it’s loaded
+                originalUploadedImage.src = event.target.result;
+                showCropModal(event.target.result);
+            };
+            cleanupFileInput();
         };
+        reader.onerror = cleanupFileInput;
         reader.readAsDataURL(file);
-    };
-    fileInput.click();
+    });
+    setTimeout(() => fileInput.click(), 0);
+    setTimeout(() => {
+        if (isTriggering && fileInput && document.body.contains(fileInput)) {
+            cleanupFileInput();
+        }
+    }, 1000);
 }
 
 function cleanupFileInput() {
@@ -89,7 +97,6 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('cropCanvas:', cropCanvas, 'cropCtx:', cropCtx); // Add this
     setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
@@ -97,9 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
         cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
         trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
         settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-        previewWidth, previewHeight, originalImageData, saveImageState
+        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData // Add this
     });
     setTriggerFileUpload(triggerFileUpload);
+    setupCropEventListeners();
 });
 
 uploadNewPhotoButton.addEventListener('click', (e) => {
@@ -171,65 +179,70 @@ img.onload = function () {
     originalHeight = img.height;
     fullResCanvas.width = originalWidth;
     fullResCanvas.height = originalHeight;
-    updateFullResContext(); // Reinitialize context after resizing
-    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
 
-    const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
-    const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
-    const minPreviewDimension = 800;
+    const maxDisplayWidth = Math.min(1920, window.innerWidth - 20);
+    const maxDisplayHeight = window.innerHeight - (window.innerWidth <= 768 ? 0.4 * window.innerHeight + 20 : 250);
+    const minPreviewDimension = 400;
     const ratio = originalWidth / originalHeight;
 
-    if (ratio > 1) {
-        previewWidth = Math.min(originalWidth, maxDisplayWidth);
-        previewHeight = previewWidth / ratio;
-        if (previewHeight > maxDisplayHeight) {
-            previewHeight = maxDisplayHeight;
-            previewWidth = previewHeight * ratio;
-        }
-        if (previewHeight < minPreviewDimension) {
-            previewHeight = minPreviewDimension;
-            previewWidth = previewHeight * ratio;
-        }
-    } else {
+    if (window.innerWidth <= 768) {
         previewHeight = Math.min(originalHeight, maxDisplayHeight);
         previewWidth = previewHeight * ratio;
         if (previewWidth > maxDisplayWidth) {
             previewWidth = maxDisplayWidth;
             previewHeight = previewWidth / ratio;
         }
-        if (previewWidth < minPreviewDimension) {
-            previewWidth = minPreviewDimension;
+    } else {
+        if (ratio > 1) {
+            previewWidth = Math.min(originalWidth, maxDisplayWidth);
             previewHeight = previewWidth / ratio;
+            if (previewHeight > maxDisplayHeight) {
+                previewHeight = maxDisplayHeight;
+                previewWidth = previewHeight * ratio;
+            }
+            if (previewHeight < minPreviewDimension) {
+                previewHeight = minPreviewDimension;
+                previewWidth = previewHeight * ratio;
+            }
+        } else {
+            previewHeight = Math.min(originalHeight, maxDisplayHeight);
+            previewWidth = previewHeight * ratio;
+            if (previewWidth > maxDisplayWidth) {
+                previewWidth = maxDisplayWidth;
+                previewHeight = previewWidth / ratio;
+            }
+            if (previewWidth < minPreviewDimension) {
+                previewWidth = minPreviewDimension;
+                previewHeight = previewWidth / ratio;
+            }
         }
     }
 
     canvas.width = Math.round(previewWidth);
     canvas.height = Math.round(previewHeight);
-    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true);
 
-document.getElementById('upload-new-photo').addEventListener('click', triggerFileUpload);
+    if (!originalUploadedImage.src || originalUploadedImage.src === "") {
+        originalUploadedImage.src = img.src;
+    }
 
-const cropCanvas = document.getElementById('crop-canvas');
-const cropCtx = cropCanvas.getContext('2d');
-initializeCropHandler({
-    cropCanvas,
-    cropCtx,
-    fullResCanvas,
-    fullResCtx,
-    img,
-    canvas,
-    ctx,
-    redrawImage,
-    originalUploadedImage,
-    trueOriginalImage,
-    originalWidth,
-    originalHeight
-
-
-});
-}
-
-
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+    ).then(() => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = previewWidth;
+        tempCanvas.height = previewHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(img, 0, 0, previewWidth, previewHeight);
+        originalImageData = tempCtx.getImageData(0, 0, previewWidth, previewHeight);
+        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+        uploadNewPhotoButton.style.display = 'block';
+        canvas.style.display = 'block'; // Show canvas after render
+    }).catch(err => {
+        console.error("Failed to redraw image on load:", err);
+        canvas.style.display = 'block'; // Show even on error to avoid infinite hide
+    });
+};
 let filterWorker;
 if (window.Worker) {
     filterWorker = new Worker(URL.createObjectURL(new Blob([`
@@ -527,6 +540,23 @@ function addButtonListeners(button, handler) {
 addButtonListeners(undoButton, debouncedUndo);
 addButtonListeners(redoButton, debouncedRedo);
 
+cropImageButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!img.src || img.src === "") {
+        console.error("No image source available to crop");
+        return;
+    }
+    showCropModal(img.src); // Pass img.src
+});
+
+cropImageButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!img.src || img.src === "") {
+        console.error("No image source available to crop");
+        return;
+    }
+    showCropModal(img.src); // Pass img.src
+});
 
 restoreButton.addEventListener('click', () => {
     settings = {

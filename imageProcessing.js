@@ -1,3 +1,4 @@
+
 // imageProcessing.js
 import { showLoadingIndicator } from './domUtils.js';
 
