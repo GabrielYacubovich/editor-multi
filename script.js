@@ -71,9 +71,14 @@ function triggerFileUpload() {
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            trueOriginalImage.onload = () => { // Ensure it’s loaded
+            trueOriginalImage.onload = () => {
                 originalUploadedImage.src = event.target.result;
-                showCropModal(event.target.result);
+                showCropModal(event.target.result, {
+                    cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, 
+                    settings, noiseSeed, initialRotation: 0, img, canvas, fullResCanvas, fullResCtx, 
+                    originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, 
+                    originalFullResImage
+                });
             };
             cleanupFileInput();
         };

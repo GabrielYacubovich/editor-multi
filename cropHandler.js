@@ -494,7 +494,10 @@ function resizeCrop(x, y) {
 }
 
 function setupCropEventListeners(cropCanvas, cropCtx) {
-    cropCanvas.addEventListener('mousedown', (e) => startCropDrag(e, cropCanvas));
+    if (!cropCanvas || !cropCtx) {
+        console.error('setupCropEventListeners: cropCanvas or cropCtx is undefined', { cropCanvas, cropCtx });
+        return;
+    }    cropCanvas.addEventListener('mousedown', (e) => startCropDrag(e, cropCanvas));
     cropCanvas.addEventListener('mousemove', (e) => adjustCropDrag(e, cropCanvas, cropCtx));
     cropCanvas.addEventListener('mouseup', (e) => stopCropDrag(e, cropCanvas, cropCtx));
     cropCanvas.addEventListener('touchstart', (e) => startCropDrag(e, cropCanvas));
