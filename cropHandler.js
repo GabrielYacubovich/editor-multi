@@ -24,6 +24,8 @@ let lockAspectRatio = false;
 let aspectRatio = 1;
 let triggerFileUpload;
 let currentImageData = null;
+let lastMouseX, lastMouseY;
+let initialDragRect = null;
 
 export function initializeCropHandler(dependencies) {
     ({
@@ -100,16 +102,22 @@ function setupCropOverlay() {
     // Calculate scale to fit in viewport while maintaining aspect ratio
     const scaleWidth = maxCanvasWidth / fullRotatedWidth;
     const scaleHeight = maxCanvasHeight / fullRotatedHeight;
-    const scale = Math.min(scaleWidth, scaleHeight);
+    const scale = Math.min(scaleWidth, scaleHeight, 1); // Don't scale up images
 
+    // Set up the crop canvas
     cropCanvas.width = Math.round(fullRotatedWidth * scale);
     cropCanvas.height = Math.round(fullRotatedHeight * scale);
     cropCanvas.dataset.scaleFactor = scale;
     cropCanvas.dataset.originalWidth = originalWidth;
     cropCanvas.dataset.originalHeight = originalHeight;
 
-    // Set initial crop rect to full canvas size
-    cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
+    // Calculate centered crop rect based on original image dimensions
+    const cropSize = Math.min(originalWidth, originalHeight) * scale;
+    const cropX = (cropCanvas.width - cropSize) / 2;
+    const cropY = (cropCanvas.height - cropSize) / 2;
+
+    // Set initial crop rect
+    cropRect = { x: cropX, y: cropY, width: cropSize, height: cropSize };
     initialCropRect = { ...cropRect };
     originalCropRect = { ...cropRect };
     
@@ -118,60 +126,6 @@ function setupCropOverlay() {
     
     // Preview the crop in the editor canvas
     previewCrop();
-}
-
-function previewCrop() {
-    if (!currentImageData) return;
-    
-    // Create a temporary canvas for the preview
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    const scale = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
-    const originalWidth = parseInt(cropCanvas.dataset.originalWidth);
-    const originalHeight = parseInt(cropCanvas.dataset.originalHeight);
-    
-    // Calculate the dimensions in the original image space
-    const cropX = cropRect.x / scale;
-    const cropY = cropRect.y / scale;
-    const cropWidth = cropRect.width / scale;
-    const cropHeight = cropRect.height / scale;
-    
-    // Set up the temporary canvas for the cropped area
-    tempCanvas.width = cropWidth;
-    tempCanvas.height = cropHeight;
-    
-    // Draw the cropped and rotated image
-    tempCtx.save();
-    
-    // Center the rotation point
-    tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
-    tempCtx.rotate(rotation * Math.PI / 180);
-    
-    // Calculate the offset to properly position the cropped area
-    const rotatedCropX = -originalWidth / 2 + cropX + cropWidth / 2;
-    const rotatedCropY = -originalHeight / 2 + cropY + cropHeight / 2;
-    tempCtx.translate(rotatedCropX, rotatedCropY);
-    
-    // Draw the image
-    tempCtx.drawImage(cropImage, 0, 0);
-    tempCtx.restore();
-    
-    // Update the preview canvas with proper scaling
-    const aspectRatio = cropWidth / cropHeight;
-    let previewWidth, previewHeight;
-    
-    if (aspectRatio > 1) {
-        previewWidth = Math.min(800, cropWidth);
-        previewHeight = previewWidth / aspectRatio;
-    } else {
-        previewHeight = Math.min(800, cropHeight);
-        previewWidth = previewHeight * aspectRatio;
-    }
-    
-    // Update the main canvas dimensions and draw the preview
-    canvas.width = previewWidth;
-    canvas.height = previewHeight;
-    ctx.drawImage(tempCanvas, 0, 0, previewWidth, previewHeight);
 }
 
 function drawCropOverlay() {
@@ -229,8 +183,130 @@ function drawCropOverlay() {
         cropCtx.fillRect(corner.x - handleSize/2, corner.y - handleSize/2, handleSize, handleSize);
     });
     
+    // Draw side handles
+    const sides = [
+        { x: cropRect.x + cropRect.width/2, y: cropRect.y }, // top
+        { x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height/2 }, // right
+        { x: cropRect.x + cropRect.width/2, y: cropRect.y + cropRect.height }, // bottom
+        { x: cropRect.x, y: cropRect.y + cropRect.height/2 } // left
+    ];
+    
+    sides.forEach(side => {
+        cropCtx.fillRect(side.x - handleSize/2, side.y - handleSize/2, handleSize, handleSize);
+    });
+    
+    // Draw grid lines for the rule of thirds
+    cropCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    cropCtx.lineWidth = 1;
+    
+    // Vertical lines
+    for (let i = 1; i < 3; i++) {
+        const x = cropRect.x + (cropRect.width * i / 3);
+        cropCtx.beginPath();
+        cropCtx.moveTo(x, cropRect.y);
+        cropCtx.lineTo(x, cropRect.y + cropRect.height);
+        cropCtx.stroke();
+    }
+    
+    // Horizontal lines
+    for (let i = 1; i < 3; i++) {
+        const y = cropRect.y + (cropRect.height * i / 3);
+        cropCtx.beginPath();
+        cropCtx.moveTo(cropRect.x, y);
+        cropCtx.lineTo(cropRect.x + cropRect.width, y);
+        cropCtx.stroke();
+    }
+    
+    // Update cursor based on position
+    updateCropCursor();
+    
     // Update preview in main canvas
     previewCrop();
+}
+
+function updateCropCursor() {
+    const rect = cropCanvas.getBoundingClientRect();
+    const x = (lastMouseX || 0) - rect.left;
+    const y = (lastMouseY || 0) - rect.top;
+    const resizeMargin = 10;
+    
+    if (nearCorner(x, y, cropRect.x, cropRect.y, resizeMargin)) {
+        cropCanvas.style.cursor = 'nw-resize';
+    } else if (nearCorner(x, y, cropRect.x + cropRect.width, cropRect.y, resizeMargin)) {
+        cropCanvas.style.cursor = 'ne-resize';
+    } else if (nearCorner(x, y, cropRect.x, cropRect.y + cropRect.height, resizeMargin)) {
+        cropCanvas.style.cursor = 'sw-resize';
+    } else if (nearCorner(x, y, cropRect.x + cropRect.width, cropRect.y + cropRect.height, resizeMargin)) {
+        cropCanvas.style.cursor = 'se-resize';
+    } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'left', resizeMargin)) {
+        cropCanvas.style.cursor = 'w-resize';
+    } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'right', resizeMargin)) {
+        cropCanvas.style.cursor = 'e-resize';
+    } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'top', resizeMargin)) {
+        cropCanvas.style.cursor = 'n-resize';
+    } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'bottom', resizeMargin)) {
+        cropCanvas.style.cursor = 's-resize';
+    } else if (insideCrop(x, y)) {
+        cropCanvas.style.cursor = 'move';
+    } else {
+        cropCanvas.style.cursor = 'default';
+    }
+}
+
+function previewCrop() {
+    if (!currentImageData) return;
+    
+    // Create a temporary canvas for the preview
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    const scale = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
+    const originalWidth = parseInt(cropCanvas.dataset.originalWidth);
+    const originalHeight = parseInt(cropCanvas.dataset.originalHeight);
+    
+    // Calculate the dimensions in the original image space
+    const cropX = cropRect.x / scale;
+    const cropY = cropRect.y / scale;
+    const cropWidth = cropRect.width / scale;
+    const cropHeight = cropRect.height / scale;
+    
+    // Set up the temporary canvas for the cropped area
+    tempCanvas.width = cropWidth;
+    tempCanvas.height = cropHeight;
+    
+    // Draw the cropped and rotated image
+    tempCtx.save();
+    
+    // Center on the crop area
+    tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+    
+    // Apply rotation
+    tempCtx.rotate(rotation * Math.PI / 180);
+    
+    // Calculate the offset to center the image in the rotated space
+    const rotatedOffsetX = -originalWidth / 2 + cropX + cropWidth / 2;
+    const rotatedOffsetY = -originalHeight / 2 + cropY + cropHeight / 2;
+    
+    // Apply the offset and draw
+    tempCtx.translate(rotatedOffsetX, rotatedOffsetY);
+    tempCtx.drawImage(cropImage, 0, 0);
+    tempCtx.restore();
+    
+    // Update the preview canvas with proper scaling
+    const aspectRatio = cropWidth / cropHeight;
+    let previewWidth, previewHeight;
+    
+    if (aspectRatio > 1) {
+        previewWidth = Math.min(800, cropWidth);
+        previewHeight = previewWidth / aspectRatio;
+    } else {
+        previewHeight = Math.min(800, cropHeight);
+        previewWidth = previewHeight * aspectRatio;
+    }
+    
+    // Update the main canvas dimensions and draw the preview
+    canvas.width = previewWidth;
+    canvas.height = previewHeight;
+    ctx.drawImage(tempCanvas, 0, 0, previewWidth, previewHeight);
 }
 
 function setupCropControls() {
@@ -309,6 +385,11 @@ function setupCropControls() {
 
     // Add mouse event listeners to cropCanvas
     cropCanvas.addEventListener('mousedown', startCropDrag);
+    cropCanvas.addEventListener('mousemove', (e) => {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        updateCropCursor();
+    });
     cropCanvas.addEventListener('mousemove', adjustCropDrag);
     cropCanvas.addEventListener('mouseup', stopCropDrag);
     cropCanvas.addEventListener('mouseleave', stopCropDrag);
@@ -350,8 +431,8 @@ function startCropDrag(e) {
         // For touch events, only prevent default if we're actually starting a drag
         const rect = cropCanvas.getBoundingClientRect();
         const touch = e.touches[0];
-        const x = (touch.clientX) - rect.left;
-        const y = (touch.clientY) - rect.top;
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
         const resizeMargin = 20;
 
         // Only prevent default if we're actually going to start dragging
@@ -369,8 +450,8 @@ function startCropDrag(e) {
     }
 
     const rect = cropCanvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches[0].clientX) - rect.left;
-    const y = (e.clientY || e.touches[0].clientY) - rect.top;
+    const x = (e.clientX || e.touches?.[0].clientX) - rect.left;
+    const y = (e.clientY || e.touches?.[0].clientY) - rect.top;
     const resizeMargin = 20;
 
     if (nearCorner(x, y, cropRect.x, cropRect.y, resizeMargin)) {
@@ -396,12 +477,22 @@ function startCropDrag(e) {
     }
 
     if (isDragging) {
+        // Store initial crop rect for aspect ratio calculations
+        initialDragRect = { ...cropRect };
+        dragStartX = x;
+        dragStartY = y;
         drawCropOverlay();
     }
 }
 
 function adjustCropDrag(e) {
-    if (!isDragging) return;
+    if (!isDragging) {
+        // Update cursor even when not dragging
+        lastMouseX = e.clientX || e.touches?.[0].clientX;
+        lastMouseY = e.clientY || e.touches?.[0].clientY;
+        updateCropCursor();
+        return;
+    }
     
     // Only prevent default if we're actually dragging
     if (e.type === 'touchmove' && isDragging) {
@@ -414,12 +505,16 @@ function adjustCropDrag(e) {
     x = clamp(x, 0, cropCanvas.width);
     y = clamp(y, 0, cropCanvas.height);
 
+    const deltaX = x - dragStartX;
+    const deltaY = y - dragStartY;
+
     if (isDragging === 'move') {
-        cropRect.x = clamp(x - dragStartX, 0, cropCanvas.width - cropRect.width);
-        cropRect.y = clamp(y - dragStartY, 0, cropCanvas.height - cropRect.height);
+        cropRect.x = clamp(initialDragRect.x + deltaX, 0, cropCanvas.width - cropRect.width);
+        cropRect.y = clamp(initialDragRect.y + deltaY, 0, cropCanvas.height - cropRect.height);
     } else {
         resizeCrop(x, y);
     }
+    
     drawCropOverlay();
 }
 
@@ -430,9 +525,36 @@ function stopCropDrag(e) {
             e.preventDefault();
         }
         isDragging = false;
+        initialDragRect = null;
+        dragStartX = null;
+        dragStartY = null;
         cropCanvas.style.cursor = 'default';
         drawCropOverlay();
     }
+}
+
+function nearCorner(x, y, cornerX, cornerY, margin) {
+    return Math.abs(x - cornerX) < margin && Math.abs(y - cornerY) < margin;
+}
+
+function nearSide(x, y, rectX, rectY, width, height, side, margin) {
+    switch (side) {
+        case 'left':
+            return Math.abs(x - rectX) < margin && y > rectY && y < rectY + height;
+        case 'right':
+            return Math.abs(x - (rectX + width)) < margin && y > rectY && y < rectY + height;
+        case 'top':
+            return Math.abs(y - rectY) < margin && x > rectX && x < rectX + width;
+        case 'bottom':
+            return Math.abs(y - (rectY + height)) < margin && x > rectX && x < rectX + width;
+        default:
+            return false;
+    }
+}
+
+function insideCrop(x, y) {
+    return x > cropRect.x && x < cropRect.x + cropRect.width &&
+           y > cropRect.y && y < cropRect.y + cropRect.height;
 }
 
 function resizeCrop(x, y) {
@@ -500,30 +622,6 @@ function resizeCrop(x, y) {
     cropRect.height = newHeight;
 }
 
-function nearCorner(x, y, cornerX, cornerY, margin) {
-    return Math.abs(x - cornerX) < margin && Math.abs(y - cornerY) < margin;
-}
-
-function nearSide(x, y, rectX, rectY, width, height, side, margin) {
-    switch (side) {
-        case 'left':
-            return Math.abs(x - rectX) < margin && y > rectY && y < rectY + height;
-        case 'right':
-            return Math.abs(x - (rectX + width)) < margin && y > rectY && y < rectY + height;
-        case 'top':
-            return Math.abs(y - rectY) < margin && x > rectX && x < rectX + width;
-        case 'bottom':
-            return Math.abs(y - (rectY + height)) < margin && x > rectX && x < rectX + width;
-        default:
-            return false;
-    }
-}
-
-function insideCrop(x, y) {
-    return x > cropRect.x && x < cropRect.x + cropRect.width &&
-           y > cropRect.y && y < cropRect.y + cropRect.height;
-}
-
 function applyCropChanges() {
     // Create a temporary canvas for the cropped image
     const tempCanvas = document.createElement('canvas');
@@ -545,16 +643,18 @@ function applyCropChanges() {
     // Draw the cropped and rotated image
     tempCtx.save();
     
-    // Center the rotation point
+    // Center on the crop area
     tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+    
+    // Apply rotation
     tempCtx.rotate(rotation * Math.PI / 180);
     
-    // Calculate the offset to properly position the cropped area
-    const rotatedCropX = -originalWidth / 2 + cropX + cropWidth / 2;
-    const rotatedCropY = -originalHeight / 2 + cropY + cropHeight / 2;
-    tempCtx.translate(rotatedCropX, rotatedCropY);
+    // Calculate the offset to center the image in the rotated space
+    const rotatedOffsetX = -originalWidth / 2 + cropX + cropWidth / 2;
+    const rotatedOffsetY = -originalHeight / 2 + cropY + cropHeight / 2;
     
-    // Draw the image
+    // Apply the offset and draw
+    tempCtx.translate(rotatedOffsetX, rotatedOffsetY);
     tempCtx.drawImage(cropImage, 0, 0);
     tempCtx.restore();
 

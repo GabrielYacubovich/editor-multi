@@ -254,6 +254,80 @@ if (window.Worker) {
     };
 }
 
+// Undo/Redo functionality
+let undoStack = [];
+let redoStack = [];
+
+function saveImageState() {
+    const currentState = {
+        imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+        settings: { ...settings }
+    };
+    undoStack.push(currentState);
+    redoStack = []; // Clear redo stack when new change is made
+    updateUndoRedoButtons();
+}
+
+function undoChange() {
+    if (undoStack.length > 0) {
+        const currentState = {
+            imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+            settings: { ...settings }
+        };
+        redoStack.push(currentState);
+        
+        const previousState = undoStack.pop();
+        canvas.width = previousState.imageData.width;
+        canvas.height = previousState.imageData.height;
+        ctx.putImageData(previousState.imageData, 0, 0);
+        settings = { ...previousState.settings };
+        updateSliderValues();
+        updateUndoRedoButtons();
+    }
+}
+
+function redoChange() {
+    if (redoStack.length > 0) {
+        const currentState = {
+            imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+            settings: { ...settings }
+        };
+        undoStack.push(currentState);
+        
+        const nextState = redoStack.pop();
+        canvas.width = nextState.imageData.width;
+        canvas.height = nextState.imageData.height;
+        ctx.putImageData(nextState.imageData, 0, 0);
+        settings = { ...nextState.settings };
+        updateSliderValues();
+        updateUndoRedoButtons();
+    }
+}
+
+function updateUndoRedoButtons() {
+    const undoButton = document.getElementById('undo-button');
+    const redoButton = document.getElementById('redo-button');
+    
+    if (undoButton) {
+        undoButton.classList.toggle('disabled', undoStack.length === 0);
+    }
+    if (redoButton) {
+        redoButton.classList.toggle('disabled', redoStack.length === 0);
+    }
+}
+
+function updateSliderValues() {
+    controls.forEach(input => {
+        if (input.id in settings) {
+            input.value = settings[input.id];
+            const output = input.parentElement.querySelector('.slider-value');
+            if (output) {
+                output.textContent = settings[input.id];
+            }
+        }
+    });
+}
+
 function triggerFileUpload() {
     if (isTriggering) return;
     isTriggering = true;
@@ -633,184 +707,6 @@ downloadButton.addEventListener('click', () => {
 });
 
 let isRedrawing = false;
-function saveImageState() {
-    imageStates = imageStates.slice(0, currentStateIndex + 1);
-    
-    const state = {
-        settings: { ...settings },
-        imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-        fullResImageData: fullResCtx.getImageData(0, 0, fullResCanvas.width, fullResCanvas.height)
-    };
-    
-    imageStates.push(state);
-    currentStateIndex = imageStates.length - 1;
-    
-    if (imageStates.length > 10) {
-        imageStates.shift();
-        currentStateIndex--;
-    }
-}
-
-function loadImageState(state) {
-    if (!state) return;
-    
-    Object.assign(settings, state.settings);
-    
-    ctx.putImageData(state.imageData, 0, 0);
-    fullResCtx.putImageData(state.fullResImageData, 0, 0);
-    
-    updateControlIndicators();
-}
-
-function handleUndo(e) {
-    e.preventDefault();
-    if (currentStateIndex > 0) {
-        currentStateIndex--;
-        loadImageState(imageStates[currentStateIndex]);
-    }
-}
-
-function handleRedo(e) {
-    e.preventDefault();
-    if (currentStateIndex < imageStates.length - 1) {
-        currentStateIndex++;
-        loadImageState(imageStates[currentStateIndex]);
-    }
-}
-
-function setupUndoRedoListeners() {
-    // Handle keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            const modalElement = document.querySelector('.modal.show');
-            if (modalElement) {
-                closeModal(modalElement);
-            }
-        } else if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (fileInput && fileInput.files.length > 0) {
-                cleanupFileInput();
-            }
-        } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-            e.preventDefault();
-            if (e.shiftKey) {
-                redoChange();
-            } else {
-                undoChange();
-            }
-        } else if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
-            e.preventDefault();
-            redoChange();
-        }
-    });
-
-    // Handle touch events for undo/redo buttons
-    const undoBtn = document.getElementById('undo-button');
-    const redoBtn = document.getElementById('redo-button');
-
-    const addButtonListeners = (button, handler) => {
-        if (!button) return;
-        
-        button.setAttribute('role', 'button');
-        button.addEventListener('click', handler);
-        
-        // Touch events
-        button.addEventListener('touchstart', (e) => {
-            // Only prevent default if the button is enabled
-            if (!button.classList.contains('disabled')) {
-                e.preventDefault();
-                handler(e);
-            }
-        }, { passive: false });
-        
-        // Prevent unwanted touch scrolling
-        button.addEventListener('touchmove', (e) => {
-            if (!button.classList.contains('disabled')) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-    };
-
-    // Add listeners with debounced handlers
-    const debouncedUndo = debounce(undoChange, 200);
-    const debouncedRedo = debounce(redoChange, 200);
-    
-    addButtonListeners(undoBtn, debouncedUndo);
-    addButtonListeners(redoBtn, debouncedRedo);
-}
-
-// Initialize undo/redo listeners
-setupUndoRedoListeners();
-
-canvas.addEventListener('click', (e) => {
-    const isNotIOS = !/iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isNotIOS) {
-        try {
-            const controlsContainer = document.querySelector('.controls');
-            const modalControls = document.getElementById('modal-controls');
-            if (!controlsContainer || !modalControls) {
-                return;
-            }
-            const clonedControls = controlsContainer.cloneNode(true);
-            modalControls.innerHTML = '';
-            modalControls.appendChild(clonedControls);
-
-            const modalInputs = modalControls.querySelectorAll('input[type="range"]');
-            modalInputs.forEach(input => {
-                input.value = settings[input.id];
-                input.addEventListener('input', debounce((e) => {
-                    const id = e.target.id;
-                    const newValue = parseInt(e.target.value);
-                    settings[id] = newValue;
-                    updateControlIndicators();
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
-                }, 300));
-            });
-
-            modalImage.src = canvas.toDataURL('image/png');
-            modal.style.display = 'block';
-
-            const modalCloseBtn = modal.querySelector('.modal-close-btn');
-            if (modalCloseBtn) {
-                modalCloseBtn.focus();
-            }
-        } catch (error) {
-            console.error("Error opening modal:", error);
-        }
-    }
-});
-
-canvas.addEventListener('touchend', (e) => {
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-        e.preventDefault();
-    }
-});
-
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        const modals = [modal, cropModal, previewModal];
-        const openModal = modals.find(m => m.style.display === 'block');
-        if (openModal) {
-            closeModal(openModal);
-        }
-        const downloadPopup = document.querySelector('div[style*="position: fixed"][style*="z-index: 1002"]');
-        const downloadOverlay = document.querySelector('div[style*="position: fixed"][style*="z-index: 1001"]');
-        if (downloadPopup && downloadOverlay) {
-            document.body.removeChild(downloadPopup);
-            document.body.removeChild(downloadOverlay);
-        }
-        if (isTriggering) {
-            cleanupFileInput();
-        }
-    } else if (e.ctrlKey && e.key === 'z') {
-        handleUndo(e);
-    } else if (e.ctrlKey && e.key === 'y') {
-        handleRedo(e);
-    }
-});
-
 function initialize() {
     isTriggering = false;
     cleanupFileInput();
@@ -887,3 +783,99 @@ function updateControlIndicators() {
         }
     });
 }
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modals = [modal, cropModal, previewModal];
+        const openModal = modals.find(m => m.style.display === 'block');
+        if (openModal) {
+            closeModal(openModal);
+        }
+        const downloadPopup = document.querySelector('div[style*="position: fixed"][style*="z-index: 1002"]');
+        const downloadOverlay = document.querySelector('div[style*="position: fixed"][style*="z-index: 1001"]');
+        if (downloadPopup && downloadOverlay) {
+            document.body.removeChild(downloadPopup);
+            document.body.removeChild(downloadOverlay);
+        }
+        if (isTriggering) {
+            cleanupFileInput();
+        }
+    } else if (e.ctrlKey && e.key === 'z') {
+        undoChange();
+    } else if (e.ctrlKey && e.key === 'y') {
+        redoChange();
+    }
+});
+
+canvas.addEventListener('click', (e) => {
+    const isNotIOS = !/iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isNotIOS) {
+        try {
+            const controlsContainer = document.querySelector('.controls');
+            const modalControls = document.getElementById('modal-controls');
+            if (!controlsContainer || !modalControls) {
+                return;
+            }
+            const clonedControls = controlsContainer.cloneNode(true);
+            modalControls.innerHTML = '';
+            modalControls.appendChild(clonedControls);
+
+            const modalInputs = modalControls.querySelectorAll('input[type="range"]');
+            modalInputs.forEach(input => {
+                input.value = settings[input.id];
+                input.addEventListener('input', debounce((e) => {
+                    const id = e.target.id;
+                    const newValue = parseInt(e.target.value);
+                    settings[id] = newValue;
+                    updateControlIndicators();
+                    redrawImage(
+                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                    );
+                }, 300));
+            });
+
+            modalImage.src = canvas.toDataURL('image/png');
+            modal.style.display = 'block';
+
+            const modalCloseBtn = modal.querySelector('.modal-close-btn');
+            if (modalCloseBtn) {
+                modalCloseBtn.focus();
+            }
+        } catch (error) {
+            console.error("Error opening modal:", error);
+        }
+    }
+});
+
+canvas.addEventListener('touchend', (e) => {
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        e.preventDefault();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modals = [modal, cropModal, previewModal];
+        const openModal = modals.find(m => m.style.display === 'block');
+        if (openModal) {
+            closeModal(openModal);
+        }
+        const downloadPopup = document.querySelector('div[style*="position: fixed"][style*="z-index: 1002"]');
+        const downloadOverlay = document.querySelector('div[style*="position: fixed"][style*="z-index: 1001"]');
+        if (downloadPopup && downloadOverlay) {
+            document.body.removeChild(downloadPopup);
+            document.body.removeChild(downloadOverlay);
+        }
+        if (isTriggering) {
+            cleanupFileInput();
+        }
+    } else if (e.ctrlKey && e.key === 'z') {
+        undoChange();
+    } else if (e.ctrlKey && e.key === 'y') {
+        redoChange();
+    }
+});
+
+undoButton.addEventListener('click', undoChange);
+redoButton.addEventListener('click', redoChange);
