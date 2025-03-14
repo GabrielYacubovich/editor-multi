@@ -1,7 +1,7 @@
 // script.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
-import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
+import { initializeCropHandler, showCropModal, setTriggerFileUpload } from './cropHandler.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -777,7 +777,7 @@ restoreButton.addEventListener('click', () => {
             ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         });
     }
-});
+};
 
 
 
