@@ -3,18 +3,10 @@ import { redrawImage } from './imageProcessing.js';
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
 import { initializeHistory } from './history.js';
 
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d', { willReadFrequently: true });
-const fullResCanvas = document.createElement('canvas');
-state.fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
-const downloadButton = document.getElementById('download');
-const uploadNewPhotoButton = document.getElementById('upload-new-photo');
-const toggleOriginalButton = document.getElementById('toggle-original');
-const cropModal = document.getElementById('crop-modal');
-const cropCanvas = document.getElementById('crop-canvas');
-const cropCtx = cropCanvas.getContext('2d');const state = {
-    canvas,
-    ctx,
+// Define state first
+const state = {
+    canvas: document.getElementById('canvas'),
+    ctx: null, // Will be set after canvas is defined
     img: new Image(),
     settings: {
         brightness: 100,
@@ -39,7 +31,7 @@ const cropCtx = cropCanvas.getContext('2d');const state = {
         'edge-detect': 0
     },
     fullResCanvas: document.createElement('canvas'),
-    fullResCtx: null,
+    fullResCtx: null, // Will be set below
     originalWidth: 0,
     originalHeight: 0,
     noiseSeed: Math.random(),
@@ -54,13 +46,26 @@ const cropCtx = cropCanvas.getContext('2d');const state = {
     lastAppliedEffect: null,
 };
 
-state.fullResCtx = state.fullResCanvas.getContext('2d');
+// Initialize canvas contexts after state is defined
+state.ctx = state.canvas.getContext('2d', { willReadFrequently: true });
+state.fullResCtx = state.fullResCanvas.getContext('2d', { willReadFrequently: true });
+
+// Other DOM elements
+const downloadButton = document.getElementById('download');
+const uploadNewPhotoButton = document.getElementById('upload-new-photo');
+const toggleOriginalButton = document.getElementById('toggle-original');
+const cropModal = document.getElementById('crop-modal');
+const cropCanvas = document.getElementById('crop-canvas');
+const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true }); // Added willReadFrequently here too
+
+// Initialize history
 initializeHistory(state);
 
 // Variables for triggerFileUpload
 let isTriggering = false;
 let fileInput = null;
 
+// Rest of your code (state.img.onload, triggerFileUpload, etc.) remains unchanged
 state.img.onload = () => {
     state.originalWidth = state.img.width;
     state.originalHeight = state.img.height;
@@ -74,11 +79,9 @@ state.img.onload = () => {
     state.canvas.width = ratio > 1 ? Math.min(maxWidth, state.originalWidth) : maxHeight * ratio;
     state.canvas.height = ratio > 1 ? state.canvas.width / ratio : Math.min(maxHeight, state.originalHeight);
 
-    // Minimal initial draw
     state.ctx.drawImage(state.img, 0, 0, state.canvas.width, state.canvas.height);
     uploadNewPhotoButton.style.display = 'block';
 
-    // Defer heavy processing
     setTimeout(() => {
         redrawImage(state, true)
             .then(() => {
@@ -87,6 +90,8 @@ state.img.onload = () => {
             .catch(err => console.error('Initial redraw failed:', err));
     }, 0);
 };
+
+
 
 // Consolidated triggerFileUpload function
 function triggerFileUpload() {

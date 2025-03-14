@@ -221,96 +221,85 @@ function setupCropControls(unfilteredCanvas) {
         fullRotatedCtx.imageSmoothingQuality = 'high';
         fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
         fullRotatedCtx.rotate(angleRad);
-        fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
-        const sourceImage = unfilteredCanvas || trueOriginalImage;
-        fullRotatedCtx.drawImage(sourceImage, 0, 0, origWidth, origHeight);
+        fullRotatedCtx.translate(-cropImage.width / 2, -cropImage.height / 2); // Fixed origWidth/origHeight
+        const sourceImage = unfilteredCanvas || state.trueOriginalImage;
+        fullRotatedCtx.drawImage(sourceImage, 0, 0, cropImage.width, cropImage.height);
+    
         const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
         const cropX = cropRect.x / scaleFactor;
         const cropY = cropRect.y / scaleFactor;
         const cropWidth = Math.round(cropRect.width / scaleFactor);
         const cropHeight = Math.round(cropRect.height / scaleFactor);
-        const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = cropWidth;
-    tempCanvas.height = cropHeight;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.imageSmoothingEnabled = true;
-    tempCtx.imageSmoothingQuality = 'high';
-    tempCtx.drawImage(
-        fullRotatedCanvas,
-        cropX, cropY, cropWidth, cropHeight,
-        0, 0, cropWidth, cropHeight
-    );
-    // Update state with the cropped image
-    state.img.src = tempCanvas.toDataURL('image/png');
-    state.originalWidth = cropWidth;
-    state.originalHeight = cropHeight;
-    state.fullResCanvas.width = cropWidth;
-    state.fullResCanvas.height = cropHeight;
-    state.fullResCtx.drawImage(tempCanvas, 0, 0, cropWidth, cropHeight);
     
-        img.src = tempCanvas.toDataURL('image/png');
-        originalUploadedImage.src = tempCanvas.toDataURL('image/png');
-        originalWidth = tempCanvas.width;
-        originalHeight = tempCanvas.height;
-        fullResCanvas.width = originalWidth;
-        fullResCanvas.height = originalHeight;
-        fullResCtx.drawImage(tempCanvas, 0, 0, originalWidth, originalHeight);
-        const previewTempCanvas = document.createElement('canvas');
-        previewTempCanvas.width = canvas.width;
-        previewTempCanvas.height = canvas.height;
-        const previewTempCtx = previewTempCanvas.getContext('2d');
-        previewTempCtx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
-        initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
-        initialRotation = rotation;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = cropWidth;
+        tempCanvas.height = cropHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.imageSmoothingEnabled = true;
+        tempCtx.imageSmoothingQuality = 'high';
+        tempCtx.drawImage(
+            fullRotatedCanvas,
+            cropX, cropY, cropWidth, cropHeight,
+            0, 0, cropWidth, cropHeight
+        );
+    
+        // Update state with the cropped image
+        state.img.src = tempCanvas.toDataURL('image/png');
+        state.originalWidth = cropWidth;
+        state.originalHeight = cropHeight;
+        state.fullResCanvas.width = cropWidth;
+        state.fullResCanvas.height = cropHeight;
+        state.fullResCtx.drawImage(tempCanvas, 0, 0, cropWidth, cropHeight);
+        state.originalUploadedImage.src = tempCanvas.toDataURL('image/png');
+    
         const loadImage = new Promise((resolve, reject) => {
-            if (img.complete && img.naturalWidth !== 0) resolve();
+            if (state.img.complete && state.img.naturalWidth !== 0) resolve();
             else {
-                img.onload = resolve;
-                img.onerror = reject;
+                state.img.onload = resolve;
+                state.img.onerror = reject;
             }
         });
+    
         loadImage.then(() => {
-            originalWidth = tempCanvas.width;
-            originalHeight = tempCanvas.height;
-            fullResCanvas.width = originalWidth;
-            fullResCanvas.height = originalHeight;
-            fullResCtx.drawImage(tempCanvas, 0, 0, originalWidth, originalHeight);
             const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
             const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
             const minPreviewDimension = 800;
-            const ratio = originalWidth / originalHeight;
+            const ratio = state.originalWidth / state.originalHeight;
+    
             if (ratio > 1) {
-                previewWidth = Math.min(originalWidth, maxDisplayWidth);
-                previewHeight = previewWidth / ratio;
-                if (previewHeight > maxDisplayHeight) {
-                    previewHeight = maxDisplayHeight;
-                    previewWidth = previewHeight * ratio;
+                state.canvas.width = Math.min(state.originalWidth, maxDisplayWidth);
+                state.canvas.height = state.canvas.width / ratio;
+                if (state.canvas.height > maxDisplayHeight) {
+                    state.canvas.height = maxDisplayHeight;
+                    state.canvas.width = state.canvas.height * ratio;
                 }
-                if (previewHeight < minPreviewDimension) {
-                    previewHeight = minPreviewDimension;
-                    previewWidth = previewHeight * ratio;
+                if (state.canvas.height < minPreviewDimension) {
+                    state.canvas.height = minPreviewDimension;
+                    state.canvas.width = state.canvas.height * ratio;
                 }
             } else {
-                previewHeight = Math.min(originalHeight, maxDisplayHeight);
-                previewWidth = previewHeight * ratio;
-                if (previewWidth > maxDisplayWidth) {
-                    previewWidth = maxDisplayWidth;
-                    previewHeight = previewWidth / ratio;
+                state.canvas.height = Math.min(state.originalHeight, maxDisplayHeight);
+                state.canvas.width = state.canvas.height * ratio;
+                if (state.canvas.width > maxDisplayWidth) {
+                    state.canvas.width = maxDisplayWidth;
+                    state.canvas.height = state.canvas.width / ratio;
                 }
-                if (previewWidth < minPreviewDimension) {
-                    previewWidth = minPreviewDimension;
-                    previewHeight = previewWidth / ratio;
+                if (state.canvas.width < minPreviewDimension) {
+                    state.canvas.width = minPreviewDimension;
+                    state.canvas.height = state.canvas.width / ratio;
                 }
             }
-            canvas.width = Math.round(previewWidth);
-            canvas.height = Math.round(previewHeight);
+    
+            state.canvas.width = Math.round(state.canvas.width);
+            state.canvas.height = Math.round(state.canvas.height);
+    
             redrawImage(state, true)
-            .then(() => {
-                state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
-                uploadNewPhotoButton.style.display = 'block';
-            })
-            .catch(err => console.error('Image load failed:', err));
-    });
+                .then(() => {
+                    state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
+                    uploadNewPhotoButton.style.display = 'block';
+                })
+                .catch(err => console.error('Image load failed:', err));
+        }).catch(err => console.error('Image load error:', err));
     });
     confirmBtn.addEventListener('touchend', (e) => {
         e.preventDefault();
