@@ -1,4 +1,9 @@
 // cropHandler.js
+import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
+import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
+import { clamp } from './utils.js';
+
+export let cropImage = new Image();
 
 // Utility function defined once at the top
 function clamp(value, min, max) {
