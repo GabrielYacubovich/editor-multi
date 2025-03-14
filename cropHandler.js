@@ -1,6 +1,5 @@
 // cropHandler.js
 import { state } from './script.js';
-import { redrawImage } from './imageProcessing.js';
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 
