@@ -1,5 +1,5 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
-import { redrawImage } from './imageProcessing.js'; // Import only redrawImage
+import { redrawImage } from './imageProcessing.js';
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
 import { initializeHistory } from './history.js';
 
@@ -9,9 +9,7 @@ const downloadButton = document.getElementById('download');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
 const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
-const cropCtx = cropCanvas.getContext('2d');
-
-const state = {
+const cropCtx = cropCanvas.getContext('2d');const state = {
     canvas,
     ctx,
     img: new Image(),
@@ -56,6 +54,10 @@ const state = {
 state.fullResCtx = state.fullResCanvas.getContext('2d');
 initializeHistory(state);
 
+// Variables for triggerFileUpload
+let isTriggering = false;
+let fileInput = null;
+
 state.img.onload = () => {
     state.originalWidth = state.img.width;
     state.originalHeight = state.img.height;
@@ -77,8 +79,11 @@ state.img.onload = () => {
         .catch(err => console.error('Initial redraw failed:', err));
 };
 
+// Consolidated triggerFileUpload function
 function triggerFileUpload() {
-    const fileInput = document.createElement('input');
+    if (isTriggering) return; // Prevent multiple triggers
+    isTriggering = true;
+    fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
     fileInput.style.display = 'none';
@@ -86,17 +91,32 @@ function triggerFileUpload() {
 
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
+        if (!file) {
+            cleanupFileInput();
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (event) => {
             state.trueOriginalImage.src = event.target.result;
             state.originalUploadedImage.src = event.target.result;
-            state.img.src = event.target.result; // Set state.img here
+            state.img.src = event.target.result;
             showCropModal(event.target.result);
-            document.body.removeChild(fileInput);
+            cleanupFileInput();
+        };
+        reader.onerror = () => {
+            console.error('File reading failed');
+            cleanupFileInput();
         };
         reader.readAsDataURL(file);
     });
+
     fileInput.click();
+    // Timeout to clean up if no file is selected
+    setTimeout(() => {
+        if (isTriggering && fileInput && document.body.contains(fileInput)) {
+            cleanupFileInput();
+        }
+    }, 1000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -119,36 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
 uploadNewPhotoButton.addEventListener('click', triggerFileUpload); // Ensure this sets state.img.src
 
 
-function triggerFileUpload() {
-    isTriggering = true;
-    fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.style.display = 'none';
-    document.body.appendChild(fileInput);
-
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            trueOriginalImage.src = event.target.result;
-            console.log("trueOriginalImage set:", trueOriginalImage.src);
-            originalUploadedImage.src = event.target.result;
-            showCropModal(event.target.result);
-            cleanupFileInput();
-        };
-        reader.onerror = cleanupFileInput;
-        reader.readAsDataURL(file);
-    });
-    setTimeout(() => {
-        fileInput.click();
-    }, 0);
-    setTimeout(() => {
-        if (isTriggering && fileInput && document.body.contains(fileInput)) {
-            cleanupFileInput();
-        }
-    }, 1000);
-}
 
 function cleanupFileInput() {
     if (fileInput && document.body.contains(fileInput)) {
@@ -159,16 +149,18 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    setupModal(modal, false);
+    setupModal(state.modal, false);
     setupModal(cropModal, false);
-    setupModal(previewModal, true);
     initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
-        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-        previewWidth, previewHeight, uploadNewPhotoButton // Add this
+        cropModal, cropCanvas, cropCtx, canvas: state.canvas, ctx: state.ctx,
+        fullResCanvas: state.fullResCanvas, fullResCtx: state.fullResCtx, img: state.img,
+        trueOriginalImage: state.trueOriginalImage, originalUploadedImage: state.originalUploadedImage,
+        originalFullResImage: state.originalFullResImage, modal: state.modal, modalImage: state.modalImage,
+        settings: state.settings, noiseSeed: state.noiseSeed, isShowingOriginal: state.isShowingOriginal,
+        originalWidth: state.originalWidth, originalHeight: state.originalHeight,
+        uploadNewPhotoButton
     });
-    setTriggerFileUpload(triggerFileUpload);
+    setTriggerFileUpload(triggerFileUpload); // Pass the function to cropHandler.js
     setupCropEventListeners();
 });
 
@@ -342,7 +334,7 @@ if (window.Worker) {
 }
 
 downloadButton.addEventListener('click', () => {
-const isEdited = Object.values(state.settings).some(value => value !== 100 && value !== 0);
+    const isEdited = Object.values(state.settings).some(value => value !== 100 && value !== 0);
     const popup = document.createElement('div');
     popup.style.position = 'fixed';
     popup.style.top = '50%';
@@ -851,3 +843,4 @@ initialize();
 
 
 
+export { state };
