@@ -363,7 +363,6 @@ function redrawImage(
     ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
     isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
 ) {
-    console.log("redrawImage - img:", img.src, "settings:", settings);
     if (!img || !img.complete || img.naturalWidth === 0) {
         console.error("redrawImage: img is invalid or not loaded", img);
         showLoadingIndicator(false);
