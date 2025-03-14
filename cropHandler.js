@@ -6,7 +6,7 @@ import { clamp } from './utils.js';
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-    uploadNewPhotoButton, saveImageState; // Add saveImageState here
+    uploadNewPhotoButton, saveImageState, originalImageData; // Add originalImageData here
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
 let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
 let initialRotation = 0;
@@ -22,7 +22,7 @@ export function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-       previewWidth, previewHeight, uploadNewPhotoButton, saveImageState } = options); // Add saveImageState
+       previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData } = options); // Add originalImageData
     setupModal(cropModal, false);
 }
 
@@ -273,15 +273,10 @@ function setupCropControls(unfilteredCanvas) {
     
             redrawImage(
                 ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState // Use the passed saveImageState
+                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
             ).then(() => {
                 originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                const tempCanvasForOriginal = document.createElement('canvas');
-                tempCanvasForOriginal.width = previewWidth;
-                tempCanvasForOriginal.height = previewHeight;
-                const tempCtxForOriginal = tempCanvasForOriginal.getContext('2d');
-                tempCtxForOriginal.drawImage(img, 0, 0, previewWidth, previewHeight);
-                originalImageData = tempCtxForOriginal.getImageData(0, 0, previewWidth, previewHeight); // Update originalImageData
+                // Remove originalImageData update; let img.onload in script.js handle it
             }).catch(err => {
                 console.error("Redraw after crop failed:", err);
             }).finally(() => {
