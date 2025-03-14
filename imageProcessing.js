@@ -2,7 +2,7 @@
 import { showLoadingIndicator } from './domUtils.js';
 
 // Basic Filters
-export function applyBasicFiltersManually(ctx, canvas, settings) {
+function applyBasicFiltersManually(ctx, canvas, settings) {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     const brightnessFactor = (settings.brightness - 100) / 100 + 1;
@@ -29,10 +29,10 @@ export function applyBasicFiltersManually(ctx, canvas, settings) {
             const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
             r = r * (1 - grayscale) + gray * grayscale;
             g = g * (1 - grayscale) + gray * grayscale;
-            b = b * (1 - grayscale) + gray * grayscale; // Fixed missing b assignment
+            b = b * (1 - grayscale) + gray * grayscale;
         }
 
-        r = clamp(r, 0, 255); // Clamp after grayscale
+        r = clamp(r, 0, 255);
         g = clamp(g, 0, 255);
         b = clamp(b, 0, 255);
 
@@ -61,7 +61,7 @@ export function applyBasicFiltersManually(ctx, canvas, settings) {
 }
 
 // Advanced Filters
-export function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
+function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve, reject) => {
         try {
             let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -111,7 +111,7 @@ export function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFact
 }
 
 // Glitch Effects
-export function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
+function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve, reject) => {
         try {
             const width = canvas.width;
@@ -258,7 +258,7 @@ export function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor
 }
 
 // Complex Filters
-export function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
+function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve, reject) => {
         try {
             const width = canvas.width;
@@ -359,7 +359,7 @@ export function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFacto
 }
 
 // Redraw Image
-export function redrawImage(
+function redrawImage(
     ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
     isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
 ) {
@@ -415,4 +415,11 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
-export { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage, clamp };
+export { 
+    applyBasicFiltersManually, 
+    applyAdvancedFilters, 
+    applyGlitchEffects, 
+    applyComplexFilters, 
+    redrawImage, 
+    clamp 
+};
