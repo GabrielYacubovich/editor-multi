@@ -6,7 +6,7 @@ import { clamp } from './utils.js';
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-    uploadNewPhotoButton, saveImageState;
+    uploadNewPhotoButton, saveImageState,originalImageData;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
 let initialCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Last confirmed state
 let initialRotation = 0; // Last confirmed rotation
@@ -56,8 +56,8 @@ export function showCropModal(imageSrc) {
         initialRotation = 0;
 
         rotation = 0;
-        drawCropImage();
-        openModal(cropModal);
+        drawCropOverlay(); // Changed from drawCropImage to drawCropOverlay
+        cropModal.style.display = 'block'; // Replace openModal
         setupCropControls();
     };
 }
@@ -194,8 +194,8 @@ function setupCropControls(unfilteredCanvas) {
         fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
         fullRotatedCtx.rotate(angleRad);
         fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
-        const sourceImage = unfilteredCanvas || trueOriginalImage;
-        fullRotatedCtx.drawImage(sourceImage, 0, 0, origWidth, origHeight);
+        const sourceImage = trueOriginalImage;
+                fullRotatedCtx.drawImage(sourceImage, 0, 0, origWidth, origHeight);
         const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
         const cropX = cropRect.x / scaleFactor;
         const cropY = cropRect.y / scaleFactor;
