@@ -71,16 +71,16 @@ function triggerFileUpload() {
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            originalUploadedImage.src = event.target.result;
-            showCropModal(event.target.result);
+            trueOriginalImage.onload = () => { // Ensure it’s loaded
+                originalUploadedImage.src = event.target.result;
+                showCropModal(event.target.result);
+            };
             cleanupFileInput();
         };
         reader.onerror = cleanupFileInput;
         reader.readAsDataURL(file);
     });
-    setTimeout(() => {
-        fileInput.click();
-    }, 0);
+    setTimeout(() => fileInput.click(), 0);
     setTimeout(() => {
         if (isTriggering && fileInput && document.body.contains(fileInput)) {
             cleanupFileInput();
@@ -138,9 +138,9 @@ function updateControlIndicators() {
 }
 
 toggleOriginalButton.addEventListener('click', () => {
-    console.log("Toggle clicked, originalImageData:", !!originalImageData, "trueOriginalImage:", trueOriginalImage.complete);
-    if (!originalImageData || !trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
-        console.error("Cannot toggle: Original image data is missing or invalid");
+    console.log("Toggle clicked, trueOriginalImage complete:", trueOriginalImage.complete, "naturalWidth:", trueOriginalImage.naturalWidth);
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image is not loaded");
         return;
     }
     isShowingOriginal = !isShowingOriginal;
@@ -150,18 +150,28 @@ toggleOriginalButton.addEventListener('click', () => {
         isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
     ).catch(err => {
         console.error("Toggle redraw failed:", err);
+        isShowingOriginal = !isShowingOriginal; // Revert on failure
+        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
 });
 
+// Update touchend listener similarly
 toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (!originalImageData) return;
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image is not loaded");
+        return;
+    }
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, false
-    );
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+    ).catch(err => {
+        console.error("Toggle redraw failed:", err);
+        isShowingOriginal = !isShowingOriginal;
+        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    });
 });
 
 img.onload = function () {
@@ -331,12 +341,12 @@ downloadButton.addEventListener('click', () => {
     const fileTypeSelect = document.getElementById('save-file-type');
     const dimensionsSpan = document.getElementById('dimensions');
     const fileSizeSpan = document.getElementById('file-size');
-    const originalDataURL = img.src;
+    const originalDataURL = originalUploadedImage.src; // Use originalUploadedImage for unedited case
 
     function updateFileInfo() {
         const scale = parseFloat(resolutionSelect.value) / 100;
-        const width = Math.round((originalWidth || 1) * scale);
-        const height = Math.round((originalHeight || 1) * scale);
+        const width = Math.round((originalWidth || fullResCanvas.width || 1) * scale);
+        const height = Math.round((originalHeight || fullResCanvas.height || 1) * scale);
         dimensionsSpan.textContent = `${width} x ${height}`;
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
@@ -344,21 +354,11 @@ downloadButton.addEventListener('click', () => {
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-        if (originalWidth && originalHeight) {
-            tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
-        } else {
-            tempCtx.fillStyle = '#000';
-            tempCtx.fillRect(0, 0, width, height);
-        }
+        tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
         const fileType = fileTypeSelect.value;
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
-            if (blob) {
-                const sizeKB = Math.round(blob.size / 1024);
-                fileSizeSpan.textContent = `${sizeKB}`;
-            } else {
-                fileSizeSpan.textContent = 'Calculando...';
-            }
+            fileSizeSpan.textContent = blob ? Math.round(blob.size / 1024) : 'Calculando...';
         }, fileType, quality);
     }
     updateFileInfo();
@@ -374,21 +374,23 @@ downloadButton.addEventListener('click', () => {
         const scale = parseFloat(resolutionSelect.value) / 100;
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
-    
-        if (!originalWidth || !originalHeight) {
-            console.error("Invalid dimensions for download:", originalWidth, originalHeight);
-            alert("Cannot download: Image dimensions are invalid.");
+
+        if (!img.complete || img.naturalWidth === 0) {
+            console.error("Image not loaded for download:", img);
+            alert("Cannot download: Image is not loaded.");
             return;
         }
-    
+
         showLoadingIndicator(true);
+        const width = Math.round((originalWidth || img.width) * scale);
+        const height = Math.round((originalHeight || img.height) * scale);
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = Math.round(originalWidth * scale);
-        tempCanvas.height = Math.round(originalHeight * scale);
+        tempCanvas.width = width;
+        tempCanvas.height = height;
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-    
+
         if (!isEdited && scale === 1.0) {
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
@@ -399,25 +401,18 @@ downloadButton.addEventListener('click', () => {
             document.body.removeChild(overlay);
             return;
         }
-    
-        if (!img || !img.complete || img.naturalWidth === 0) {
-            console.error("Image not ready for download:", img);
-            showLoadingIndicator(false);
-            alert("Image is not loaded properly.");
-            return;
-        }
-    
+
         redrawImage(
             ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
         ).then(() => {
-            tempCtx.drawImage(fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
             const quality = fileType === 'image/png' ? undefined : 1.0;
             tempCanvas.toBlob((blob) => {
                 if (!blob || blob.size === 0) {
                     console.error("Generated blob is empty");
-                    showLoadingIndicator(false);
                     alert("Failed to generate downloadable image.");
+                    showLoadingIndicator(false);
                     return;
                 }
                 const link = document.createElement('a');
@@ -431,8 +426,8 @@ downloadButton.addEventListener('click', () => {
             }, fileType, quality);
         }).catch(error => {
             console.error("Download failed:", error);
-            showLoadingIndicator(false);
             alert("An error occurred while processing the image.");
+            showLoadingIndicator(false);
             document.body.removeChild(popup);
             document.body.removeChild(overlay);
         });
@@ -442,13 +437,6 @@ downloadButton.addEventListener('click', () => {
         document.body.removeChild(popup);
         document.body.removeChild(overlay);
     });
-
-    saveCancelBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        document.body.removeChild(popup);
-        document.body.removeChild(overlay);
-    });
-
     overlay.addEventListener('click', () => {
         document.body.removeChild(popup);
         document.body.removeChild(overlay);
