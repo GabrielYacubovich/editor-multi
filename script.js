@@ -159,19 +159,12 @@ toggleOriginalButton.addEventListener('click', () => {
 toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
-        console.error("Cannot toggle: Original image is not loaded");
+        console.error("Cannot toggle: Original image not loaded");
         return;
     }
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    redrawImage(
-        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
-    ).catch(err => {
-        console.error("Toggle redraw failed:", err);
-        isShowingOriginal = !isShowingOriginal;
-        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    });
+    ctx.drawImage(isShowingOriginal ? trueOriginalImage : fullResCanvas, 0, 0, canvas.width, canvas.height); // Direct draw instead of redrawImage
 });
 
 img.onload = function () {
@@ -245,45 +238,39 @@ img.onload = function () {
 };
 let filterWorker;
 if (window.Worker) {
-    filterWorker = new Worker(URL.createObjectURL(new Blob([`
-        self.onmessage = function(e) {
-            const { imageData, noiseSeed, scaleFactor, settings } = e.data;
-            const data = imageData.data;
-            const vibrance = (settings.vibrance - 100) / 100;
-            const highlights = settings.highlights / 100;
-            const shadows = settings.shadows / 100;
-            const noise = settings.noise;
-            for (let i = 0; i < data.length; i += 4) {
-                if (settings.temperature > 100) {
-                    data[i] *= (settings.temperature / 100);
-                    data[i + 2] *= (200 - settings.temperature) / 100;
-                } else {
-                    data[i] *= settings.temperature / 100;
-                    data[i + 2] *= (200 - settings.temperature) / 100;
-                }
-                let r = data[i];
-                let g = data[i + 1];
-                let b = data[i + 2];
-                let avg = (r + g + b) / 3;
-                data[i] += (r - avg) * vibrance;
-                data[i + 1] += (g - avg) * vibrance;
-                data[i + 2] += (b - avg) * vibrance;
-                if (r > 128) data[i] *= highlights;
-                else data[i] *= shadows;
-                if (g > 128) data[i + 1] *= highlights;
-                else data[i + 1] *= shadows;
-                if (b > 128) data[i + 2] *= highlights;
-                else data[i + 2] *= shadows;
-                let randomValue = Math.sin(noiseSeed + i * 12.9898) * 43758.5453;
-                randomValue = randomValue - Math.floor(randomValue);
-                let noiseAmount = (randomValue - 0.5) * noise * scaleFactor;
-                data[i] = Math.max(0, Math.min(255, data[i] + noiseAmount));
-                data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noiseAmount));
-                data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noiseAmount));
-            }
-            self.postMessage({ imageData });
+    const redrawWorker = new Worker(URL.createObjectURL(new Blob([`
+        importScripts('imageProcessing.js');
+        self.onmessage = async (e) => {
+            const { imgData, settings, noiseSeed, width, height } = e.data;
+            const offscreenCanvas = new OffscreenCanvas(width, height);
+            const ctx = offscreenCanvas.getContext('2d');
+            ctx.putImageData(imgData, 0, 0);
+            await applyBasicFiltersManually(ctx, offscreenCanvas, settings);
+            await applyAdvancedFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
+            await applyGlitchEffects(ctx, offscreenCanvas, settings, noiseSeed, 1);
+            await applyComplexFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
+            const resultData = ctx.getImageData(0, 0, width, height);
+            self.postMessage({ imageData: resultData });
         };
     `], { type: 'application/javascript' })));
+
+    redrawWorker.onmessage = (e) => {
+        ctx.putImageData(e.data.imageData, 0, 0);
+        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+        canvas.style.display = 'block';
+        showLoadingIndicator(false);
+    };
+
+    // In confirmBtn.click()
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = cropWidth;
+    tempCanvas.height = cropHeight;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(fullRotatedCanvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
+    redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
+} else {
+    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState);
 }
 
 downloadButton.addEventListener('click', () => {

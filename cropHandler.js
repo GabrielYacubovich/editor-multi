@@ -20,7 +20,14 @@ let lockAspectRatio = false;
 let aspectRatio = 1;
 let settings, noiseSeed, isShowingOriginal;
 let originalWidth, originalHeight, previewWidth, previewHeight;
-
+const debouncedStopCropDrag = debounce(stopCropDrag, 100);
+cropCanvas.addEventListener('touchend', debouncedStopCropDrag);
+// For confirmBtn
+const debouncedConfirmClick = debounce(() => confirmBtn.click(), 200);
+confirmBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    debouncedConfirmClick();
+});
 export function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
