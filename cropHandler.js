@@ -29,6 +29,10 @@ export function initializeCropHandler(options) {
 }
 
 export function showCropModal(imageSrc) {
+    if (!imageSrc || typeof imageSrc !== 'string' || imageSrc.trim() === '') {
+        console.error("showCropModal: Invalid or missing imageSrc", imageSrc);
+        return;
+    }
     cropImage.src = imageSrc;
     cropImage.onload = () => {
         const displayWidth = Math.min(cropImage.width, window.innerWidth * 0.8);
@@ -56,9 +60,12 @@ export function showCropModal(imageSrc) {
         initialRotation = 0;
 
         rotation = 0;
-        drawCropOverlay(); // Changed from drawCropImage to drawCropOverlay
-        cropModal.style.display = 'block'; // Replace openModal
+        drawCropOverlay();
+        cropModal.style.display = 'block';
         setupCropControls();
+    };
+    cropImage.onerror = () => {
+        console.error("Failed to load cropImage with src:", imageSrc);
     };
 }
 
