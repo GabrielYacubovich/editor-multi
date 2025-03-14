@@ -375,12 +375,16 @@ export function redrawImage(state, saveState = false) {
     state.fullResCanvas.width = state.originalWidth;
     state.fullResCanvas.height = state.originalHeight;
 
-    applyBasicFiltersManually(fullResCtx, state.fullResCanvas, state.settings); // Ensure this is imported
+    // Draw the initial image to fullResCanvas
+    state.fullResCtx.drawImage(state.img, 0, 0, state.originalWidth, state.originalHeight);
+
+    // Apply filters
+    applyBasicFiltersManually(state.fullResCtx, state.fullResCanvas, state.settings);
     const scaleFactor = 1;
 
-    return applyAdvancedFilters(fullResCtx, state.fullResCanvas, state.noiseSeed, scaleFactor) // Ensure imported
-        .then(() => applyGlitchEffects(fullResCtx, state.fullResCanvas, state.noiseSeed, scaleFactor)) // Ensure imported
-        .then(() => applyComplexFilters(fullResCtx, state.fullResCanvas, state.noiseSeed, scaleFactor)) // Ensure imported
+    return applyAdvancedFilters(state.fullResCtx, state.fullResCanvas, state.settings, state.noiseSeed, scaleFactor)
+        .then(() => applyGlitchEffects(state.fullResCtx, state.fullResCanvas, state.settings, state.noiseSeed, scaleFactor))
+        .then(() => applyComplexFilters(state.fullResCtx, state.fullResCanvas, state.settings, state.noiseSeed, scaleFactor))
         .then(() => {
             const ctx = state.canvas.getContext('2d');
             ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
@@ -401,7 +405,7 @@ export function redrawImage(state, saveState = false) {
                 state.modalImage.src = state.canvas.toDataURL('image/png');
             }
             if (saveState) saveImageState(state);
-    showLoadingIndicator(false);
+            showLoadingIndicator(false);
         })
         .catch(err => {
             console.error('Redraw error:', err);

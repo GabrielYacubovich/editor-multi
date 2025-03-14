@@ -1,7 +1,7 @@
 // cropHandler.js
 import { state } from './script.js';
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
-import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
+import { redrawImage } from './imageProcessing.js';
 
 // DOM elements (passed from script.js)
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
@@ -22,25 +22,18 @@ let settings, noiseSeed, isShowingOriginal; // To be set via initialize
 let originalWidth, originalHeight, previewWidth, previewHeight; // To be set via initialize
 
 function initializeCropHandler(options) {
-    ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, previewWidth, previewHeight,uploadNewPhotoButton } = options);
+    ({ cropModal, cropCanvas, cropCtx, uploadNewPhotoButton } = options);
     setupModal(cropModal, false);
 }
 
 function showCropModal(dataURL = null) {
     cropModal.style.display = 'block';
-    
-    if (!dataURL) {
-        // Re-show crop modal with current image
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = trueOriginalImage.width;
-        tempCanvas.height = trueOriginalImage.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(trueOriginalImage, 0, 0);
-        applyBasicFiltersManually(tempCtx, tempCanvas, settings);
-        return applyAdvancedFilters(tempCtx, tempCanvas, settings, noiseSeed, 1)
-            .then(() => applyGlitchEffects(tempCtx, tempCanvas, settings, noiseSeed, 1))
-            .then(() => applyComplexFilters(tempCtx, tempCanvas, settings, noiseSeed, 1))
-            .then(() => {
+    if (dataURL) {
+        cropImage.src = dataURL;
+        return new Promise((resolve) => {
+            if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
+            else cropImage.onload = resolve;
+        }).then(() => {
                 cropImage.src = tempCanvas.toDataURL('image/png');
                 return new Promise((resolve) => {
                     if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
@@ -208,12 +201,6 @@ function setupCropControls(unfilteredCanvas) {
     confirmBtn.addEventListener('click', (e) => {
         e.preventDefault();
         closeModal(cropModal);
-        const origWidth = cropImage.width;
-        const origHeight = cropImage.height;
-        if (origWidth === 0 || origHeight === 0) {
-            closeModal(cropModal);
-            return;
-        }
         const angleRad = rotation * Math.PI / 180;
         const cosA = Math.abs(Math.cos(angleRad));
         const sinA = Math.abs(Math.sin(angleRad));
@@ -311,17 +298,12 @@ function setupCropControls(unfilteredCanvas) {
             canvas.width = Math.round(previewWidth);
             canvas.height = Math.round(previewHeight);
             redrawImage(state, true)
-        .then(() => {
-            state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
-        })
-        .catch(err => {
-            console.error('Image load failed:', err);
-        })
-        .finally(() => {
-            closeModal(cropModal);
-            uploadNewPhotoButton.style.display = 'block';
-        });
-});
+            .then(() => {
+                state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
+                uploadNewPhotoButton.style.display = 'block';
+            })
+            .catch(err => console.error('Image load failed:', err));
+    });
     });
     confirmBtn.addEventListener('touchend', (e) => {
         e.preventDefault();

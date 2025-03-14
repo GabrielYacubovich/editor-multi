@@ -1,56 +1,16 @@
-// script.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
-import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
+import { redrawImage } from './imageProcessing.js'; // Import only redrawImage
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
 import { initializeHistory } from './history.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const downloadButton = document.getElementById('download');
-const controls = document.querySelectorAll('.controls input');
-const undoButton = document.getElementById('undo');
-const redoButton = document.getElementById('redo');
-const restoreButton = document.getElementById('restore');
-const cropImageButton = document.getElementById('crop-image-button');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
-const toggleOriginalButton = document.getElementById('toggle-original');
-const modal = document.getElementById('image-modal');
-const modalImage = document.getElementById('modal-image');
 const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
 const cropCtx = cropCanvas.getContext('2d');
-const previewModal = document.getElementById('preview-modal');
-let img = new Image();
-let originalImageData = null;
-let noiseSeed = Math.random();
-let fullResCanvas = document.createElement('canvas');
-let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
-let isShowingOriginal = false;
-let originalFullResImage = new Image();
-let originalUploadedImage = new Image();
-let trueOriginalImage = new Image();
-let settings = {
-    brightness: 100,
-    contrast: 100,
-    grayscale: 0,
-    vibrance: 100,
-    highlights: 100,
-    shadows: 100,
-    noise: 0,
-    exposure: 100,
-    temperature: 100,
-    saturation: 100,
-    'glitch-chromatic': 0,
-    'glitch-rgb-split': 0,
-    'glitch-chromatic-vertical': 0,
-    'glitch-chromatic-diagonal': 0,
-    'glitch-pixel-shuffle': 0,
-    'glitch-wave': 0,
-    'kaleidoscope-segments': 0,
-    'kaleidoscope-offset': 0,
-    'vortex-twist': 0,
-    'edge-detect': 0
-};
+
 const state = {
     canvas,
     ctx,
@@ -66,9 +26,6 @@ const state = {
         exposure: 100,
         temperature: 100,
         saturation: 100,
-        history: [],
-    redoHistory: [],
-    lastAppliedEffect: null,
         'glitch-chromatic': 0,
         'glitch-rgb-split': 0,
         'glitch-chromatic-vertical': 0,
@@ -79,7 +36,6 @@ const state = {
         'kaleidoscope-offset': 0,
         'vortex-twist': 0,
         'edge-detect': 0
-        
     },
     fullResCanvas: document.createElement('canvas'),
     fullResCtx: null,
@@ -88,6 +44,8 @@ const state = {
     noiseSeed: Math.random(),
     isShowingOriginal: false,
     trueOriginalImage: new Image(),
+    originalUploadedImage: new Image(),
+    originalFullResImage: new Image(),
     modal: document.getElementById('image-modal'),
     modalImage: document.getElementById('modal-image'),
     history: [],
@@ -95,16 +53,9 @@ const state = {
     lastAppliedEffect: null,
 };
 
-// Initialize fullResCtx
-initializeHistory(state);
 state.fullResCtx = state.fullResCanvas.getContext('2d');
-let history = [{ filters: { ...settings }, imageData: null }];
-let redoHistory = [];
-let lastAppliedEffect = null;
-let originalWidth, originalHeight, previewWidth, previewHeight;
+initializeHistory(state);
 
-let isTriggering = false;
-let fileInput = null;
 state.img.onload = () => {
     state.originalWidth = state.img.width;
     state.originalHeight = state.img.height;
@@ -112,7 +63,6 @@ state.img.onload = () => {
     state.fullResCanvas.height = state.originalHeight;
     state.fullResCtx.drawImage(state.img, 0, 0, state.originalWidth, state.originalHeight);
 
-    // Set canvas preview size (simplified from all-in-one)
     const maxWidth = Math.min(1920, window.innerWidth - 100);
     const maxHeight = window.innerHeight - 250;
     const ratio = state.originalWidth / state.originalHeight;
@@ -122,9 +72,48 @@ state.img.onload = () => {
     redrawImage(state, true)
         .then(() => {
             state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
+            uploadNewPhotoButton.style.display = 'block';
         })
         .catch(err => console.error('Initial redraw failed:', err));
 };
+
+function triggerFileUpload() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            state.trueOriginalImage.src = event.target.result;
+            state.originalUploadedImage.src = event.target.result;
+            state.img.src = event.target.result; // Set state.img here
+            showCropModal(event.target.result);
+            document.body.removeChild(fileInput);
+        };
+        reader.readAsDataURL(file);
+    });
+    fileInput.click();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setupModal(state.modal, false);
+    setupModal(cropModal, false);
+    initializeCropHandler({
+        cropModal, cropCanvas, cropCtx, canvas: state.canvas, ctx: state.ctx,
+        fullResCanvas: state.fullResCanvas, fullResCtx: state.fullResCtx, img: state.img,
+        trueOriginalImage: state.trueOriginalImage, originalUploadedImage: state.originalUploadedImage,
+        originalFullResImage: state.originalFullResImage, modal: state.modal, modalImage: state.modalImage,
+        settings: state.settings, noiseSeed: state.noiseSeed, isShowingOriginal: state.isShowingOriginal,
+        originalWidth: state.originalWidth, originalHeight: state.originalHeight,
+        uploadNewPhotoButton
+    });
+    setTriggerFileUpload(triggerFileUpload);
+    setupCropEventListeners();
+});
 
 // Trigger initial file upload or use a default image if needed
 uploadNewPhotoButton.addEventListener('click', triggerFileUpload); // Ensure this sets state.img.src
@@ -353,7 +342,7 @@ if (window.Worker) {
 }
 
 downloadButton.addEventListener('click', () => {
-    const isEdited = Object.values(state.settings).some(value => value !== 100 && value !== 0);
+const isEdited = Object.values(state.settings).some(value => value !== 100 && value !== 0);
     const popup = document.createElement('div');
     popup.style.position = 'fixed';
     popup.style.top = '50%';
@@ -862,4 +851,3 @@ initialize();
 
 
 
-export { state };
