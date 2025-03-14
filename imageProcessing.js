@@ -1,8 +1,5 @@
 import { showLoadingIndicator } from './domUtils.js';
 import { saveImageState } from './history.js';
-import { applyAdvancedFilters } from './advancedFilters.js';
-import { applyGlitchEffects } from './glitchEffects.js';
-import { applyComplexFilters } from './complexFilters.js';
 
 // Basic Filters (unchanged, matches old behavior)
 function applyBasicFiltersManually(ctx, canvas, settings) {
