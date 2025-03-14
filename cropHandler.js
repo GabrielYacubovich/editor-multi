@@ -16,7 +16,7 @@ function setTriggerFileUpload(fn) {
     triggerFileUpload = fn;
 }
 
-function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, initialRotation, img, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage }) {
+function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, initialRotation, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState }) {
     if (!dataURL) {
         cropModal.style.display = 'block';
         const tempCanvas = document.createElement('canvas');
@@ -37,7 +37,7 @@ function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOri
             })
             .then(() => {
                 rotation = initialRotation;
-                setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage });
+                setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState });
                 drawCropOverlay(cropCanvas, cropCtx);
             });
     } else {
@@ -60,7 +60,7 @@ function showCropModal(dataURL = null, { cropModal, cropCanvas, cropCtx, trueOri
             cropCanvas.height = Math.round(fullRotatedHeight * scale);
             cropCanvas.dataset.scaleFactor = scale;
             cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
-            setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage });
+            setupCropControls(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState });
             drawCropOverlay(cropCanvas, cropCtx);
         };
         if (cropImage.complete && cropImage.naturalWidth) cropImage.onload();
@@ -127,7 +127,7 @@ function drawCropOverlay(cropCanvas, cropCtx) {
     }
 }
 
-function setupCropControls(unfilteredCanvas, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage }) {
+function setupCropControls(unfilteredCanvas, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, img, canvas, ctx, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage, isShowingOriginal, saveImageState }) {
     const cropControls = document.getElementById('crop-controls');
     cropControls.innerHTML = `
         <div class="crop-control-group">
@@ -312,7 +312,7 @@ function setupCropControls(unfilteredCanvas, { cropModal, cropCanvas, cropCtx, t
             }
             canvas.width = Math.round(previewWidth);
             canvas.height = Math.round(previewHeight);
-            redrawImage(true)
+            redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState)
                 .then(() => {
                     originalFullResImage.src = fullResCanvas.toDataURL('image/png');
                 });
@@ -353,7 +353,7 @@ function setupCropControls(unfilteredCanvas, { cropModal, cropCanvas, cropCtx, t
         canvas.width = Math.round(previewWidth);
         canvas.height = Math.round(previewHeight);
         closeModal(cropModal);
-        redrawImage(true)
+        redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState)
             .then(() => {
                 originalFullResImage.src = fullResCanvas.toDataURL('image/png');
             });
@@ -497,7 +497,8 @@ function setupCropEventListeners(cropCanvas, cropCtx) {
     if (!cropCanvas || !cropCtx) {
         console.error('setupCropEventListeners: cropCanvas or cropCtx is undefined', { cropCanvas, cropCtx });
         return;
-    }    cropCanvas.addEventListener('mousedown', (e) => startCropDrag(e, cropCanvas));
+    }
+    cropCanvas.addEventListener('mousedown', (e) => startCropDrag(e, cropCanvas));
     cropCanvas.addEventListener('mousemove', (e) => adjustCropDrag(e, cropCanvas, cropCtx));
     cropCanvas.addEventListener('mouseup', (e) => stopCropDrag(e, cropCanvas, cropCtx));
     cropCanvas.addEventListener('touchstart', (e) => startCropDrag(e, cropCanvas));
@@ -534,18 +535,24 @@ function setupCropEventListeners(cropCanvas, cropCtx) {
     });
 }
 
-function initializeCropHandler({ cropModal, cropCanvas, cropCtx, img, trueOriginalImage, originalUploadedImage, settings, noiseSeed, originalFullResImage, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight }) {
-    const cropImageButton = document.getElementById('crop-image-button');
+function initializeCropHandler(params) {
+    const { cropModal, cropCanvas, cropCtx, img, trueOriginalImage, originalUploadedImage, settings, noiseSeed, originalFullResImage, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, isShowingOriginal, saveImageState } = params;
+    console.log('initializeCropHandler params:', { cropCanvas, cropCtx });
+    if (!cropCanvas || !cropCtx) {
+        console.error('initializeCropHandler: cropCanvas or cropCtx is undefined');
+        return;
+    }
     setupCropEventListeners(cropCanvas, cropCtx);
+    const cropImageButton = document.getElementById('crop-image-button');
     cropImageButton.addEventListener('click', (e) => {
         e.preventDefault();
         if (!img.src || img.src === '') return;
-        showCropModal(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, initialRotation: 0, img, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage });
+        showCropModal(null, params);
     });
     cropImageButton.addEventListener('touchend', (e) => {
         e.preventDefault();
         if (!img.src || img.src === '') return;
-        showCropModal(null, { cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, settings, noiseSeed, initialRotation: 0, img, canvas, fullResCanvas, fullResCtx, originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, originalFullResImage });
+        showCropModal(null, params);
     });
 }
 

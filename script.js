@@ -77,7 +77,7 @@ function triggerFileUpload() {
                     cropModal, cropCanvas, cropCtx, trueOriginalImage, originalUploadedImage, 
                     settings, noiseSeed, initialRotation: 0, img, canvas, fullResCanvas, fullResCtx, 
                     originalImageData, originalWidth, originalHeight, previewWidth, previewHeight, 
-                    originalFullResImage
+                    originalFullResImage, isShowingOriginal, saveImageState
                 });
             };
             cleanupFileInput();
@@ -102,6 +102,7 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('cropCanvas:', cropCanvas, 'cropCtx:', cropCtx); // Add this
     setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
@@ -112,7 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
         previewWidth, previewHeight, originalImageData, saveImageState
     });
     setTriggerFileUpload(triggerFileUpload);
-    setupCropEventListeners();
 });
 
 uploadNewPhotoButton.addEventListener('click', (e) => {
