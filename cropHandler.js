@@ -2,8 +2,7 @@
 // cropHandler.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
-import { clamp } from './utils.js';
-
+import { clamp, debounce } from './utils.js'; // Add debounce to the import
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
@@ -558,12 +557,13 @@ export function setTriggerFileUpload(fn) {
 }
 
 export function setupCropEventListeners() {
+    const debouncedStopCropDrag = debounce(stopCropDrag, 100); // Define here with imported debounce
     cropCanvas.addEventListener('mousedown', startCropDrag);
     cropCanvas.addEventListener('mousemove', adjustCropDrag);
     cropCanvas.addEventListener('mouseup', stopCropDrag);
     cropCanvas.addEventListener('touchstart', startCropDrag, { passive: false });
     cropCanvas.addEventListener('touchmove', adjustCropDrag, { passive: false });
-    cropCanvas.addEventListener('touchend', stopCropDrag);
+    cropCanvas.addEventListener('touchend', debouncedStopCropDrag); // Use debounced version
     cropCanvas.addEventListener('mouseleave', (e) => {
         if (isDragging) stopCropDrag(e);
         if (isDragging) stopCropDrag(e);
