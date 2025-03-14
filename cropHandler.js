@@ -2,17 +2,17 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { clamp, debounce } from './utils.js';
-import { redrawWorker } from './script.js'; // Import redrawWorker
+import { redrawWorker } from './script.js';
 
 export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-    uploadNewPhotoButton, saveImageState, originalImageData; // Removed redrawWorker from here
+    uploadNewPhotoButton, saveImageState, originalImageData;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
-let initialCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Last confirmed state
-let initialRotation = 0; // Last confirmed rotation
-let originalCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Original uploaded state
-let originalRotation = 0; // Original uploaded rotation (typically 0)
+let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
+let initialRotation = 0;
+let originalCropRect = { x: 0, y: 0, width: 0, height: 0 };
+let originalRotation = 0;
 let rotation = 0;
 let isDragging = false;
 let startX, startY;
@@ -20,14 +20,15 @@ let lockAspectRatio = false;
 let aspectRatio = 1;
 let settings, noiseSeed, isShowingOriginal;
 let originalWidth, originalHeight, previewWidth, previewHeight;
+let originalCropImage = new Image();
 
 export function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData } = options);
-    // No need to assign redrawWorker here; it's already imported
     setupModal(cropModal, false);
+    setupCropEventListeners();
 }
 
 export function showCropModal(imageSrc) {
@@ -35,41 +36,43 @@ export function showCropModal(imageSrc) {
         console.error("showCropModal: Invalid or missing imageSrc", imageSrc);
         return;
     }
+
     cropImage.src = imageSrc;
     cropImage.onload = () => {
-        const displayWidth = Math.min(cropImage.width, window.innerWidth * 0.8);
-        const displayHeight = Math.min(cropImage.height, window.innerHeight * 0.8 - 100);
-        const scale = Math.min(displayWidth / cropImage.width, displayHeight / cropImage.height);
-        const canvasWidth = cropImage.width * scale;
-        const canvasHeight = cropImage.height * scale;
-
-        cropCanvas.width = canvasWidth;
-        cropCanvas.height = canvasHeight;
+        const maxCanvasWidth = window.innerWidth - 100;
+        const maxCanvasHeight = window.innerHeight - 250;
+        const angleRad = rotation * Math.PI / 180;
+        const cosA = Math.abs(Math.cos(angleRad));
+        const sinA = Math.abs(Math.sin(angleRad));
+        const fullRotatedWidth = Math.ceil(cropImage.width * cosA + cropImage.height * sinA);
+        const fullRotatedHeight = Math.ceil(cropImage.width * sinA + cropImage.height * cosA);
+        const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
+        
+        cropCanvas.width = Math.round(fullRotatedWidth * scale);
+        cropCanvas.height = Math.round(fullRotatedHeight * scale);
         cropCanvas.dataset.scaleFactor = scale;
 
-        // Set original state (full image, no rotation)
-        originalCropRect = { x: 0, y: 0, width: cropImage.width, height: cropImage.height };
-        originalRotation = 0;
+        // Initialize crop rect to full canvas size
+        cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
+        
+        if (!originalCropRect.width || !originalCropRect.height) {
+            originalCropRect = { ...cropRect };
+            originalRotation = rotation;
+        }
+        
+        initialCropRect = { ...cropRect };
+        initialRotation = rotation;
 
-        // Set initial crop rect (can be adjusted later)
-        cropRect = {
-            x: canvasWidth * 0.1,
-            y: canvasHeight * 0.1,
-            width: canvasWidth * 0.8,
-            height: canvasHeight * 0.8
-        };
-        initialCropRect = { ...cropRect }; // Initial state matches first display
-        initialRotation = 0;
-
-        rotation = 0;
         drawCropOverlay();
         cropModal.style.display = 'block';
         setupCropControls();
     };
+
     cropImage.onerror = () => {
         console.error("Failed to load cropImage with src:", imageSrc);
     };
 }
+
 function setupCropControls() {
     const cropControls = document.getElementById('crop-controls');
     cropControls.innerHTML = `
@@ -320,66 +323,104 @@ function setupCropControls() {
     });
 }
 
+function setupCropEventListeners() {
+    const debouncedStopCropDrag = debounce(stopCropDrag, 100);
+
+    if (!cropCanvas) {
+        console.error("setupCropEventListeners: cropCanvas is undefined. Ensure initializeCropHandler is called first.");
+        return;
+    }
+
+    cropCanvas.addEventListener('mousedown', startCropDrag);
+    cropCanvas.addEventListener('mousemove', adjustCropDrag);
+    cropCanvas.addEventListener('mouseup', stopCropDrag);
+    cropCanvas.addEventListener('touchstart', startCropDrag, { passive: false });
+    cropCanvas.addEventListener('touchmove', adjustCropDrag, { passive: false });
+    cropCanvas.addEventListener('touchend', debouncedStopCropDrag);
+    cropCanvas.addEventListener('mouseleave', (e) => {
+        if (isDragging) stopCropDrag(e);
+    });
+    cropCanvas.addEventListener('mousemove', (e) => {
+        const rect = cropCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const resizeMargin = 20;
+        if (nearCorner(x, y, cropRect.x, cropRect.y, resizeMargin)) {
+            cropCanvas.style.cursor = 'nwse-resize';
+        } else if (nearCorner(x, y, cropRect.x + cropRect.width, cropRect.y, resizeMargin)) {
+            cropCanvas.style.cursor = 'nesw-resize';
+        } else if (nearCorner(x, y, cropRect.x, cropRect.y + cropRect.height, resizeMargin)) {
+            cropCanvas.style.cursor = 'nesw-resize';
+        } else if (nearCorner(x, y, cropRect.x + cropRect.width, cropRect.y + cropRect.height, resizeMargin)) {
+            cropCanvas.style.cursor = 'nwse-resize';
+        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'left', resizeMargin)) {
+            cropCanvas.style.cursor = 'ew-resize';
+        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'right', resizeMargin)) {
+            cropCanvas.style.cursor = 'ew-resize';
+        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'top', resizeMargin)) {
+            cropCanvas.style.cursor = 'ns-resize';
+        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'bottom', resizeMargin)) {
+            cropCanvas.style.cursor = 'ns-resize';
+        } else if (insideCrop(x, y)) {
+            cropCanvas.style.cursor = 'move';
+        } else {
+            cropCanvas.style.cursor = 'default';
+        }
+    });
+
+    const stopDragHandler = () => stopCropDrag(new Event('mouseup'));
+    document.addEventListener('mouseup', stopDragHandler);
+    document.addEventListener('touchend', stopDragHandler);
+}
 
 function drawCropOverlay() {
-    cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
-    const originalWidth = cropImage.width;
-    const originalHeight = cropImage.height;
+    if (!cropImage.complete || cropImage.naturalWidth === 0) {
+        console.error("Cannot draw crop overlay: cropImage not loaded");
+        return;
+    }
+
     const angleRad = rotation * Math.PI / 180;
-    const cosA = Math.abs(Math.cos(angleRad));
-    const sinA = Math.abs(Math.sin(angleRad));
-    const fullRotatedWidth = Math.ceil(originalWidth * cosA + originalHeight * sinA);
-    const fullRotatedHeight = Math.ceil(originalWidth * sinA + originalHeight * cosA);
-
-    const maxCanvasWidth = window.innerWidth - 100;
-    const maxCanvasHeight = window.innerHeight - 250;
-    const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
-
-    const prevWidth = cropCanvas.width;
-    const prevHeight = cropCanvas.height;
-    cropCanvas.width = Math.round(fullRotatedWidth * scale);
-    cropCanvas.height = Math.round(fullRotatedHeight * scale);
-    cropCanvas.dataset.scaleFactor = scale;
-
-    if ((prevWidth !== cropCanvas.width || prevHeight !== cropCanvas.height) && 
-        (cropRect.width === 0 || cropRect.height === 0)) {
-        cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
-    }
-
     cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+    
+    // Save the current context state
     cropCtx.save();
+    
+    // Translate to center, rotate, and translate back
     cropCtx.translate(cropCanvas.width / 2, cropCanvas.height / 2);
-    cropCtx.scale(scale, scale);
     cropCtx.rotate(angleRad);
-    cropCtx.translate(-originalWidth / 2, -originalHeight / 2);
-    cropCtx.filter = 'blur(5px)';
-    cropCtx.drawImage(cropImage, 0, 0, originalWidth, originalHeight);
+    cropCtx.translate(-cropCanvas.width / 2, -cropCanvas.height / 2);
+    
+    // Draw the image
+    cropCtx.drawImage(cropImage, 0, 0, cropCanvas.width, cropCanvas.height);
+    
+    // Restore the context state
     cropCtx.restore();
-
-    cropCtx.save();
-    cropCtx.beginPath();
-    cropCtx.rect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
-    cropCtx.clip();
-    cropCtx.translate(cropCanvas.width / 2, cropCanvas.height / 2);
-    cropCtx.scale(scale, scale);
-    cropCtx.rotate(angleRad);
-    cropCtx.translate(-originalWidth / 2, -originalHeight / 2);
-    cropCtx.filter = 'none';
-    cropCtx.drawImage(cropImage, 0, 0, originalWidth, originalHeight);
-    cropCtx.restore();
-
-    cropCtx.strokeStyle = '#800000';
-    cropCtx.lineWidth = 3;
-    cropCtx.setLineDash([5, 5]);
+    
+    // Draw semi-transparent overlay
+    cropCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+    
+    // Clear the crop area
+    cropCtx.clearRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
+    
+    // Draw crop border
+    cropCtx.strokeStyle = '#fff';
+    cropCtx.lineWidth = 2;
     cropCtx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
-    cropCtx.setLineDash([]);
-
-    if (isDragging) {
-        cropRect.x = clamp(cropRect.x, 0, cropCanvas.width - cropRect.width);
-        cropRect.y = clamp(cropRect.y, 0, cropCanvas.height - cropRect.height);
-        cropRect.width = clamp(cropRect.width, 10, cropCanvas.width - cropRect.x);
-        cropRect.height = clamp(cropRect.height, 10, cropCanvas.height - cropRect.y);
-    }
+    
+    // Draw corner handles
+    const handleSize = 10;
+    const corners = [
+        { x: cropRect.x, y: cropRect.y },
+        { x: cropRect.x + cropRect.width, y: cropRect.y },
+        { x: cropRect.x, y: cropRect.y + cropRect.height },
+        { x: cropRect.x + cropRect.width, y: cropRect.y + cropRect.height }
+    ];
+    
+    corners.forEach(corner => {
+        cropCtx.fillStyle = '#fff';
+        cropCtx.fillRect(corner.x - handleSize/2, corner.y - handleSize/2, handleSize, handleSize);
+    });
 }
 
 function startCropDrag(e) {
@@ -515,56 +556,6 @@ function resizeCrop(x, y) {
     cropRect.y = clamp(cropRect.y, 0, cropCanvas.height - cropRect.height);
     cropRect.width = clamp(cropRect.width, 10, cropCanvas.width - cropRect.x);
     cropRect.height = clamp(cropRect.height, 10, cropCanvas.height - cropRect.y);
-}
-
-export function setupCropEventListeners() {
-    const debouncedStopCropDrag = debounce(stopCropDrag, 100);
-
-    if (!cropCanvas) {
-        console.error("setupCropEventListeners: cropCanvas is undefined. Ensure initializeCropHandler is called first.");
-        return;
-    }
-
-    cropCanvas.addEventListener('mousedown', startCropDrag);
-    cropCanvas.addEventListener('mousemove', adjustCropDrag);
-    cropCanvas.addEventListener('mouseup', stopCropDrag);
-    cropCanvas.addEventListener('touchstart', startCropDrag, { passive: false });
-    cropCanvas.addEventListener('touchmove', adjustCropDrag, { passive: false });
-    cropCanvas.addEventListener('touchend', debouncedStopCropDrag);
-    cropCanvas.addEventListener('mouseleave', (e) => {
-        if (isDragging) stopCropDrag(e);
-    });
-    cropCanvas.addEventListener('mousemove', (e) => {
-        const rect = cropCanvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const resizeMargin = 20;
-        if (nearCorner(x, y, cropRect.x, cropRect.y, resizeMargin)) {
-            cropCanvas.style.cursor = 'nwse-resize';
-        } else if (nearCorner(x, y, cropRect.x + cropRect.width, cropRect.y, resizeMargin)) {
-            cropCanvas.style.cursor = 'nesw-resize';
-        } else if (nearCorner(x, y, cropRect.x, cropRect.y + cropRect.height, resizeMargin)) {
-            cropCanvas.style.cursor = 'nesw-resize';
-        } else if (nearCorner(x, y, cropRect.x + cropRect.width, cropRect.y + cropRect.height, resizeMargin)) {
-            cropCanvas.style.cursor = 'nwse-resize';
-        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'left', resizeMargin)) {
-            cropCanvas.style.cursor = 'ew-resize';
-        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'right', resizeMargin)) {
-            cropCanvas.style.cursor = 'ew-resize';
-        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'top', resizeMargin)) {
-            cropCanvas.style.cursor = 'ns-resize';
-        } else if (nearSide(x, y, cropRect.x, cropRect.y, cropRect.width, cropRect.height, 'bottom', resizeMargin)) {
-            cropCanvas.style.cursor = 'ns-resize';
-        } else if (insideCrop(x, y)) {
-            cropCanvas.style.cursor = 'move';
-        } else {
-            cropCanvas.style.cursor = 'default';
-        }
-    });
-
-    const stopDragHandler = () => stopCropDrag(new Event('mouseup'));
-    document.addEventListener('mouseup', stopDragHandler);
-    document.addEventListener('touchend', stopDragHandler);
 }
 
 function insideCrop(x, y) {

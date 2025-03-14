@@ -239,6 +239,10 @@ if (window.Worker) {
 }
 
 function triggerFileUpload() {
+    if (isTriggering) {
+        console.warn('File upload already in progress');
+        return;
+    }
     isTriggering = true;
     fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -248,24 +252,49 @@ function triggerFileUpload() {
 
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
+        if (!file) {
+            cleanupFileInput();
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = (event) => {
-            trueOriginalImage.src = event.target.result;
-            trueOriginalImage.onload = () => { // Ensure it’s loaded
+            if (!event.target || typeof event.target.result !== 'string') {
+                console.error('Failed to read file');
+                cleanupFileInput();
+                return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                trueOriginalImage.src = event.target.result;
                 originalUploadedImage.src = event.target.result;
                 showCropModal(event.target.result);
+                cleanupFileInput();
             };
+            img.onerror = () => {
+                console.error('Failed to load image');
+                cleanupFileInput();
+            };
+            img.src = event.target.result;
+        };
+        reader.onerror = () => {
+            console.error('Failed to read file');
             cleanupFileInput();
         };
-        reader.onerror = cleanupFileInput;
         reader.readAsDataURL(file);
     });
-    setTimeout(() => fileInput.click(), 0);
+
+    setTimeout(() => {
+        fileInput.click();
+    }, 0);
+
+    // Safety timeout to cleanup if no file is selected
     setTimeout(() => {
         if (isTriggering && fileInput && document.body.contains(fileInput)) {
             cleanupFileInput();
         }
-    }, 1000);
+    }, 300000); // 5 minutes timeout
 }
 
 function cleanupFileInput() {
@@ -280,15 +309,36 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
+
+    // Initialize crop handler with all required dependencies
     initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
-        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData,
-        redrawWorker // Add redrawWorker here
+        cropModal,
+        cropCanvas,
+        cropCtx,
+        canvas,
+        ctx,
+        fullResCanvas,
+        fullResCtx,
+        img,
+        trueOriginalImage,
+        originalUploadedImage,
+        originalFullResImage,
+        modal,
+        modalImage,
+        settings,
+        noiseSeed,
+        isShowingOriginal,
+        originalWidth,
+        originalHeight,
+        previewWidth,
+        previewHeight,
+        uploadNewPhotoButton,
+        saveImageState,
+        originalImageData
     });
+
+    // Set up file upload trigger function
     setTriggerFileUpload(triggerFileUpload);
-    setupCropEventListeners();
 });
 
 uploadNewPhotoButton.addEventListener('click', (e) => {
@@ -508,7 +558,7 @@ downloadButton.addEventListener('click', () => {
         const fileType = fileTypeSelect.value;
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
-            fileSizeSpan.textContent = blob ? Math.round(blob.size / 1024) : 'Calculando...';
+            fileSizeSpan.textContent = blob ? Math.round(blob.size / 1024) : 'Calculating...';
         }, fileType, quality);
     }
     updateFileInfo();
