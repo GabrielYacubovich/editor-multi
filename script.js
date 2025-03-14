@@ -4,9 +4,12 @@ import { initializeCropHandler, showCropModal, setupCropEventListeners, setTrigg
 import { initializeHistory } from './history.js';
 
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const fullResCanvas = document.createElement('canvas');
+state.fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
 const downloadButton = document.getElementById('download');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
+const toggleOriginalButton = document.getElementById('toggle-original');
 const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
 const cropCtx = cropCanvas.getContext('2d');const state = {
@@ -71,12 +74,18 @@ state.img.onload = () => {
     state.canvas.width = ratio > 1 ? Math.min(maxWidth, state.originalWidth) : maxHeight * ratio;
     state.canvas.height = ratio > 1 ? state.canvas.width / ratio : Math.min(maxHeight, state.originalHeight);
 
-    redrawImage(state, true)
-        .then(() => {
-            state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
-            uploadNewPhotoButton.style.display = 'block';
-        })
-        .catch(err => console.error('Initial redraw failed:', err));
+    // Minimal initial draw
+    state.ctx.drawImage(state.img, 0, 0, state.canvas.width, state.canvas.height);
+    uploadNewPhotoButton.style.display = 'block';
+
+    // Defer heavy processing
+    setTimeout(() => {
+        redrawImage(state, true)
+            .then(() => {
+                state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
+            })
+            .catch(err => console.error('Initial redraw failed:', err));
+    }, 0);
 };
 
 // Consolidated triggerFileUpload function
@@ -197,14 +206,10 @@ toggleOriginalButton.addEventListener('click', () => {
         console.error("Cannot toggle: Original image data is missing or invalid");
         return;
     }
-    isShowingOriginal = !isShowingOriginal;
-    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    redrawImage(
-        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
-    ).catch(err => {
-        console.error("Toggle redraw failed:", err);
-    });
+    state.isShowingOriginal = !state.isShowingOriginal; // Use state.isShowingOriginal
+    toggleOriginalButton.textContent = state.isShowingOriginal ? 'Editada' : 'Original';
+    redrawImage(state, false) // Update to use state directly
+        .catch(err => console.error("Toggle redraw failed:", err));
 });
 
 toggleOriginalButton.addEventListener('touchend', (e) => {

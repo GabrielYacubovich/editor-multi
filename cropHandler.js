@@ -3,6 +3,7 @@ import { state } from './script.js';
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { redrawImage } from './imageProcessing.js';
 
+
 // DOM elements (passed from script.js)
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
@@ -210,12 +211,12 @@ function setupCropControls(unfilteredCanvas) {
         const angleRad = rotation * Math.PI / 180;
         const cosA = Math.abs(Math.cos(angleRad));
         const sinA = Math.abs(Math.sin(angleRad));
-        const fullRotatedWidth = Math.ceil(origWidth * cosA + origHeight * sinA);
-        const fullRotatedHeight = Math.ceil(origWidth * sinA + origHeight * cosA);
+        const fullRotatedWidth = Math.ceil(cropImage.width * cosA + cropImage.height * sinA);
+        const fullRotatedHeight = Math.ceil(cropImage.width * sinA + cropImage.height * cosA);
         const fullRotatedCanvas = document.createElement('canvas');
         fullRotatedCanvas.width = fullRotatedWidth;
         fullRotatedCanvas.height = fullRotatedHeight;
-        const fullRotatedCtx = fullRotatedCanvas.getContext('2d');
+        const fullRotatedCtx = fullRotatedCanvas.getContext('2d', { willReadFrequently: true });
         fullRotatedCtx.imageSmoothingEnabled = true;
         fullRotatedCtx.imageSmoothingQuality = 'high';
         fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
@@ -598,8 +599,8 @@ function setupCropEventListeners() {
     cropCanvas.addEventListener('mousedown', startCropDrag);
     cropCanvas.addEventListener('mousemove', adjustCropDrag);
     cropCanvas.addEventListener('mouseup', stopCropDrag);
-    cropCanvas.addEventListener('touchstart', startCropDrag);
-    cropCanvas.addEventListener('touchmove', adjustCropDrag);
+    cropCanvas.addEventListener('touchstart', startCropDrag, { passive: false }); // Explicitly non-passive
+    cropCanvas.addEventListener('touchmove', adjustCropDrag, { passive: false }); // Explicitly non-passive
     cropCanvas.addEventListener('touchend', stopCropDrag);
     cropCanvas.addEventListener('mouseleave', (e) => {
         if (isDragging) stopCropDrag(e);
