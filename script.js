@@ -4,8 +4,8 @@ const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const fullResCanvas = document.createElement('canvas');
 const fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
 const controls = document.querySelectorAll('.controls input');
-const undoButton = document.getElementById('undo');
-const redoButton = document.getElementById('redo');
+const undoButton = document.getElementById('undo-button');
+const redoButton = document.getElementById('redo-button');
 const restoreButton = document.getElementById('restore');
 const toggleOriginalButton = document.getElementById('toggle-original');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
@@ -678,27 +678,68 @@ function handleRedo(e) {
     }
 }
 
-const debouncedUndo = debounce(handleUndo, 200);
-const debouncedRedo = debounce(handleRedo, 200);
+function setupUndoRedoListeners() {
+    // Handle keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modalElement = document.querySelector('.modal.show');
+            if (modalElement) {
+                closeModal(modalElement);
+            }
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (fileInput && fileInput.files.length > 0) {
+                cleanupFileInput();
+            }
+        } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+                redoChange();
+            } else {
+                undoChange();
+            }
+        } else if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+            e.preventDefault();
+            redoChange();
+        }
+    });
 
-function addButtonListeners(button, handler) {
-    button.setAttribute('role', 'button');
-    button.addEventListener('click', handler);
-    button.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        handler(e);
-    }, { passive: false });
-    button.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        handler(e);
-    }, { passive: false });
-    button.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+    // Handle touch events for undo/redo buttons
+    const undoBtn = document.getElementById('undo-button');
+    const redoBtn = document.getElementById('redo-button');
+
+    const addButtonListeners = (button, handler) => {
+        if (!button) return;
+        
+        button.setAttribute('role', 'button');
+        button.addEventListener('click', handler);
+        
+        // Touch events
+        button.addEventListener('touchstart', (e) => {
+            // Only prevent default if the button is enabled
+            if (!button.classList.contains('disabled')) {
+                e.preventDefault();
+                handler(e);
+            }
+        }, { passive: false });
+        
+        // Prevent unwanted touch scrolling
+        button.addEventListener('touchmove', (e) => {
+            if (!button.classList.contains('disabled')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    };
+
+    // Add listeners with debounced handlers
+    const debouncedUndo = debounce(undoChange, 200);
+    const debouncedRedo = debounce(redoChange, 200);
+    
+    addButtonListeners(undoBtn, debouncedUndo);
+    addButtonListeners(redoBtn, debouncedRedo);
 }
 
-addButtonListeners(undoButton, debouncedUndo);
-addButtonListeners(redoButton, debouncedRedo);
+// Initialize undo/redo listeners
+setupUndoRedoListeners();
 
 canvas.addEventListener('click', (e) => {
     const isNotIOS = !/iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -764,9 +805,9 @@ document.addEventListener('keydown', (e) => {
             cleanupFileInput();
         }
     } else if (e.ctrlKey && e.key === 'z') {
-        debouncedUndo(e);
+        handleUndo(e);
     } else if (e.ctrlKey && e.key === 'y') {
-        debouncedRedo(e);
+        handleRedo(e);
     }
 });
 
