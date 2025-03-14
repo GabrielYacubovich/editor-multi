@@ -126,15 +126,12 @@ function setupCropControls(unfilteredCanvas) {
         e.preventDefault();
         rotation = originalRotation; // Reset to original rotation (0)
         cropRect = { ...originalCropRect }; // Reset to original full image
-        drawCropImage();
-                if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
-            console.error("Restore failed: trueOriginalImage is not loaded", trueOriginalImage);
-            return;
-        }
+        drawCropOverlay(); // Fixed: Replace drawCropImage with drawCropOverlay
+        // Remove the redundant block below and rely on the simplified reset
         rotation = 0;
         rotationInput.value = 0;
         rotationValue.textContent = '0°';
-    
+
         const maxCanvasWidth = window.innerWidth - 100;
         const maxCanvasHeight = window.innerHeight - 250;
         let width = trueOriginalImage.width;
