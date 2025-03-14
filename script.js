@@ -1,101 +1,64 @@
+// script.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
-import { redrawImage } from './imageProcessing.js';
+import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
-import { initializeHistory } from './history.js';
 
-// Define state first
-const state = {
-    canvas: document.getElementById('canvas'),
-    ctx: null, // Will be set after canvas is defined
-    img: new Image(),
-    settings: {
-        brightness: 100,
-        contrast: 100,
-        grayscale: 0,
-        vibrance: 100,
-        highlights: 100,
-        shadows: 100,
-        noise: 0,
-        exposure: 100,
-        temperature: 100,
-        saturation: 100,
-        'glitch-chromatic': 0,
-        'glitch-rgb-split': 0,
-        'glitch-chromatic-vertical': 0,
-        'glitch-chromatic-diagonal': 0,
-        'glitch-pixel-shuffle': 0,
-        'glitch-wave': 0,
-        'kaleidoscope-segments': 0,
-        'kaleidoscope-offset': 0,
-        'vortex-twist': 0,
-        'edge-detect': 0
-    },
-    fullResCanvas: document.createElement('canvas'),
-    fullResCtx: null, // Will be set below
-    originalWidth: 0,
-    originalHeight: 0,
-    noiseSeed: Math.random(),
-    isShowingOriginal: false,
-    trueOriginalImage: new Image(),
-    originalUploadedImage: new Image(),
-    originalFullResImage: new Image(),
-    modal: document.getElementById('image-modal'),
-    modalImage: document.getElementById('modal-image'),
-    history: [],
-    redoHistory: [],
-    lastAppliedEffect: null,
-};
-
-// Initialize canvas contexts after state is defined
-state.ctx = state.canvas.getContext('2d', { willReadFrequently: true });
-state.fullResCtx = state.fullResCanvas.getContext('2d', { willReadFrequently: true });
-
-// Other DOM elements
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const controls = document.querySelectorAll('.controls input');
+const undoButton = document.getElementById('undo');
+const redoButton = document.getElementById('redo');
+const restoreButton = document.getElementById('restore');
 const downloadButton = document.getElementById('download');
+const cropImageButton = document.getElementById('crop-image-button');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
 const toggleOriginalButton = document.getElementById('toggle-original');
+const modal = document.getElementById('image-modal');
+const modalImage = document.getElementById('modal-image');
 const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
-const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true }); // Added willReadFrequently here too
+const cropCtx = cropCanvas.getContext('2d');
+const previewModal = document.getElementById('preview-modal');
+let img = new Image();
+let originalImageData = null;
+let noiseSeed = Math.random();
+let fullResCanvas = document.createElement('canvas');
+let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
+let isShowingOriginal = false;
+let originalFullResImage = new Image();
+let originalUploadedImage = new Image();
+let trueOriginalImage = new Image();
+let settings = {
+    brightness: 100,
+    contrast: 100,
+    grayscale: 0,
+    vibrance: 100,
+    highlights: 100,
+    shadows: 100,
+    noise: 0,
+    exposure: 100,
+    temperature: 100,
+    saturation: 100,
+    'glitch-chromatic': 0,
+    'glitch-rgb-split': 0,
+    'glitch-chromatic-vertical': 0,
+    'glitch-chromatic-diagonal': 0,
+    'glitch-pixel-shuffle': 0,
+    'glitch-wave': 0,
+    'kaleidoscope-segments': 0,
+    'kaleidoscope-offset': 0,
+    'vortex-twist': 0,
+    'edge-detect': 0
+};
+let history = [{ filters: { ...settings }, imageData: null }];
+let redoHistory = [];
+let lastAppliedEffect = null;
+let originalWidth, originalHeight, previewWidth, previewHeight;
 
-// Initialize history
-initializeHistory(state);
-
-// Variables for triggerFileUpload
 let isTriggering = false;
 let fileInput = null;
 
-// Rest of your code (state.img.onload, triggerFileUpload, etc.) remains unchanged
-state.img.onload = () => {
-    state.originalWidth = state.img.width;
-    state.originalHeight = state.img.height;
-    state.fullResCanvas.width = state.originalWidth;
-    state.fullResCanvas.height = state.originalHeight;
-    state.fullResCtx.drawImage(state.img, 0, 0, state.originalWidth, state.originalHeight);
-
-    const maxWidth = Math.min(1920, window.innerWidth - 100);
-    const maxHeight = window.innerHeight - 250;
-    const ratio = state.originalWidth / state.originalHeight;
-    state.canvas.width = ratio > 1 ? Math.min(maxWidth, state.originalWidth) : maxHeight * ratio;
-    state.canvas.height = ratio > 1 ? state.canvas.width / ratio : Math.min(maxHeight, state.originalHeight);
-
-    state.ctx.drawImage(state.img, 0, 0, state.canvas.width, state.canvas.height);
-    uploadNewPhotoButton.style.display = 'block';
-
-    setTimeout(() => {
-        redrawImage(state, true)
-            .then(() => {
-                state.originalFullResImage.src = state.fullResCanvas.toDataURL('image/png');
-            })
-            .catch(err => console.error('Initial redraw failed:', err));
-    }, 0);
-};
-
-
-
-// Consolidated triggerFileUpload function
 function triggerFileUpload() {
-    if (isTriggering) return; // Prevent multiple triggers
     isTriggering = true;
     fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -105,54 +68,26 @@ function triggerFileUpload() {
 
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (!file) {
-            cleanupFileInput();
-            return;
-        }
         const reader = new FileReader();
         reader.onload = (event) => {
-            state.trueOriginalImage.src = event.target.result;
-            state.originalUploadedImage.src = event.target.result;
-            state.img.src = event.target.result;
+            trueOriginalImage.src = event.target.result;
+            console.log("trueOriginalImage set:", trueOriginalImage.src);
+            originalUploadedImage.src = event.target.result;
             showCropModal(event.target.result);
             cleanupFileInput();
         };
-        reader.onerror = () => {
-            console.error('File reading failed');
-            cleanupFileInput();
-        };
+        reader.onerror = cleanupFileInput;
         reader.readAsDataURL(file);
     });
-
-    fileInput.click();
-    // Timeout to clean up if no file is selected
+    setTimeout(() => {
+        fileInput.click();
+    }, 0);
     setTimeout(() => {
         if (isTriggering && fileInput && document.body.contains(fileInput)) {
             cleanupFileInput();
         }
     }, 1000);
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    setupModal(state.modal, false);
-    setupModal(cropModal, false);
-    initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas: state.canvas, ctx: state.ctx,
-        fullResCanvas: state.fullResCanvas, fullResCtx: state.fullResCtx, img: state.img,
-        trueOriginalImage: state.trueOriginalImage, originalUploadedImage: state.originalUploadedImage,
-        originalFullResImage: state.originalFullResImage, modal: state.modal, modalImage: state.modalImage,
-        settings: state.settings, noiseSeed: state.noiseSeed, isShowingOriginal: state.isShowingOriginal,
-        originalWidth: state.originalWidth, originalHeight: state.originalHeight,
-        uploadNewPhotoButton
-    });
-    setTriggerFileUpload(triggerFileUpload);
-    setupCropEventListeners();
-});
-
-// Trigger initial file upload or use a default image if needed
-uploadNewPhotoButton.addEventListener('click', triggerFileUpload); // Ensure this sets state.img.src
-
-
 
 function cleanupFileInput() {
     if (fileInput && document.body.contains(fileInput)) {
@@ -163,18 +98,16 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    setupModal(state.modal, false);
+    setupModal(modal, false);
     setupModal(cropModal, false);
+    setupModal(previewModal, true);
     initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas: state.canvas, ctx: state.ctx,
-        fullResCanvas: state.fullResCanvas, fullResCtx: state.fullResCtx, img: state.img,
-        trueOriginalImage: state.trueOriginalImage, originalUploadedImage: state.originalUploadedImage,
-        originalFullResImage: state.originalFullResImage, modal: state.modal, modalImage: state.modalImage,
-        settings: state.settings, noiseSeed: state.noiseSeed, isShowingOriginal: state.isShowingOriginal,
-        originalWidth: state.originalWidth, originalHeight: state.originalHeight,
-        uploadNewPhotoButton
+        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
+        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
+        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
+        previewWidth, previewHeight, uploadNewPhotoButton // Add this
     });
-    setTriggerFileUpload(triggerFileUpload); // Pass the function to cropHandler.js
+    setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
 });
 
@@ -211,10 +144,14 @@ toggleOriginalButton.addEventListener('click', () => {
         console.error("Cannot toggle: Original image data is missing or invalid");
         return;
     }
-    state.isShowingOriginal = !state.isShowingOriginal; // Use state.isShowingOriginal
-    toggleOriginalButton.textContent = state.isShowingOriginal ? 'Editada' : 'Original';
-    redrawImage(state, false) // Update to use state directly
-        .catch(err => console.error("Toggle redraw failed:", err));
+    isShowingOriginal = !isShowingOriginal;
+    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+    ).catch(err => {
+        console.error("Toggle redraw failed:", err);
+    });
 });
 
 toggleOriginalButton.addEventListener('touchend', (e) => {
@@ -344,7 +281,7 @@ if (window.Worker) {
 }
 
 downloadButton.addEventListener('click', () => {
-    const isEdited = Object.values(state.settings).some(value => value !== 100 && value !== 0);
+    const isEdited = Object.values(settings).some(value => value !== 100 && value !== 0);
     const popup = document.createElement('div');
     popup.style.position = 'fixed';
     popup.style.top = '50%';
@@ -399,12 +336,12 @@ downloadButton.addEventListener('click', () => {
     const fileTypeSelect = document.getElementById('save-file-type');
     const dimensionsSpan = document.getElementById('dimensions');
     const fileSizeSpan = document.getElementById('file-size');
-    const originalDataURL = state.img.src;
+    const originalDataURL = img.src;
 
     function updateFileInfo() {
         const scale = parseFloat(resolutionSelect.value) / 100;
-        const width = Math.round((state.originalWidth || 1) * scale);
-        const height = Math.round((state.originalHeight || 1) * scale);
+        const width = Math.round((originalWidth || 1) * scale);
+        const height = Math.round((originalHeight || 1) * scale);
         dimensionsSpan.textContent = `${width} x ${height}`;
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
@@ -412,8 +349,8 @@ downloadButton.addEventListener('click', () => {
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-        if (state.originalWidth && state.originalHeight) {
-            tempCtx.drawImage(state.fullResCanvas, 0, 0, width, height);
+        if (originalWidth && originalHeight) {
+            tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
         } else {
             tempCtx.fillStyle = '#000';
             tempCtx.fillRect(0, 0, width, height);
@@ -442,8 +379,21 @@ downloadButton.addEventListener('click', () => {
         const scale = parseFloat(resolutionSelect.value) / 100;
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
+    
+        if (!originalWidth || !originalHeight) {
+            console.error("Invalid dimensions for download:", originalWidth, originalHeight);
+            alert("Cannot download: Image dimensions are invalid.");
+            return;
+        }
+    
         showLoadingIndicator(true);
-
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = Math.round(originalWidth * scale);
+        tempCanvas.height = Math.round(originalHeight * scale);
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.imageSmoothingEnabled = true;
+        tempCtx.imageSmoothingQuality = 'high';
+    
         if (!isEdited && scale === 1.0) {
             const link = document.createElement('a');
             link.download = `${sanitizedFileName}.${extension}`;
@@ -454,46 +404,52 @@ downloadButton.addEventListener('click', () => {
             document.body.removeChild(overlay);
             return;
         }
-
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = Math.round(state.originalWidth * scale);
-        tempCanvas.height = Math.round(state.originalHeight * scale);
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.imageSmoothingEnabled = true;
-        tempCtx.imageSmoothingQuality = 'high';
-
-        // Ensure redrawImage updates fullResCanvas before drawing
-        redrawImage(state, false)
-            .then(() => {
-                tempCtx.drawImage(state.fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
-                const quality = fileType === 'image/png' ? undefined : 1.0;
-                tempCanvas.toBlob((blob) => {
-                    if (!blob) {
-                        console.error('Generated blob is empty');
-                        showLoadingIndicator(false);
-                        document.body.removeChild(popup);
-                        document.body.removeChild(overlay);
-                        return;
-                    }
-                    const link = document.createElement('a');
-                    link.download = `${sanitizedFileName}-${Math.round(scale * 100)}%.${extension}`;
-                    link.href = URL.createObjectURL(blob);
-                    link.click();
-                    URL.revokeObjectURL(link.href);
+    
+        if (!img || !img.complete || img.naturalWidth === 0) {
+            console.error("Image not ready for download:", img);
+            showLoadingIndicator(false);
+            alert("Image is not loaded properly.");
+            return;
+        }
+    
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        ).then(() => {
+            tempCtx.drawImage(fullResCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+            const quality = fileType === 'image/png' ? undefined : 1.0;
+            tempCanvas.toBlob((blob) => {
+                if (!blob || blob.size === 0) {
+                    console.error("Generated blob is empty");
                     showLoadingIndicator(false);
-                    document.body.removeChild(popup);
-                    document.body.removeChild(overlay);
-                }, fileType, quality);
-            })
-            .catch(error => {
-                console.error('Error during redraw for download:', error);
+                    alert("Failed to generate downloadable image.");
+                    return;
+                }
+                const link = document.createElement('a');
+                link.download = `${sanitizedFileName}-${Math.round(scale * 100)}%.${extension}`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                URL.revokeObjectURL(link.href);
                 showLoadingIndicator(false);
                 document.body.removeChild(popup);
                 document.body.removeChild(overlay);
-            });
+            }, fileType, quality);
+        }).catch(error => {
+            console.error("Download failed:", error);
+            showLoadingIndicator(false);
+            alert("An error occurred while processing the image.");
+            document.body.removeChild(popup);
+            document.body.removeChild(overlay);
+        });
     });
 
     saveCancelBtn.addEventListener('click', () => {
+        document.body.removeChild(popup);
+        document.body.removeChild(overlay);
+    });
+
+    saveCancelBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
         document.body.removeChild(popup);
         document.body.removeChild(overlay);
     });
@@ -851,6 +807,3 @@ initialize();
 
 
 
-
-
-export { state };

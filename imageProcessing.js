@@ -1,5 +1,6 @@
+
+
 import { showLoadingIndicator } from './domUtils.js';
-import { saveImageState } from './history.js';
 
 // Basic Filters (unchanged, matches old behavior)
 function applyBasicFiltersManually(ctx, canvas, settings) {
@@ -355,58 +356,62 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 }
 
 // Redraw Image (unchanged, works with updated filters)
-export function redrawImage(state, saveState = false) {
-    if (!state.fullResCanvas || !state.fullResCtx || !state.img || !state.originalWidth || !state.originalHeight) {
-        console.error('Required state properties missing:', {
-            fullResCanvas: !!state.fullResCanvas,
-            fullResCtx: !!state.fullResCtx,
-            img: !!state.img,
-            originalWidth: state.originalWidth,
-            originalHeight: state.originalHeight
-        });
+function redrawImage(
+    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+    isShowingOriginal, trueOriginalImage, modal, modalImage, saveState = false, saveImageStateCallback
+) {
+    console.log("redrawImage - img:", img, "settings:", settings);
+    if (!img) {
+        console.error("redrawImage: img is undefined or null");
         showLoadingIndicator(false);
-        return Promise.reject('Invalid state for redraw');
+        return Promise.reject("Missing img");
+    }
+    if (!img.complete || img.naturalWidth === 0) {
+        console.error("redrawImage: img is not loaded or has invalid dimensions", img.src);
+        showLoadingIndicator(false);
+        return Promise.reject("Image not loaded");
     }
     showLoadingIndicator(true);
-    state.fullResCanvas.width = state.originalWidth;
-    state.fullResCanvas.height = state.originalHeight;
-
-    // Draw the initial image to fullResCanvas
-    state.fullResCtx.drawImage(state.img, 0, 0, state.originalWidth, state.originalHeight);
-
-    // Apply filters
-    applyBasicFiltersManually(state.fullResCtx, state.fullResCanvas, state.settings);
+    fullResCanvas.width = img.width;
+    fullResCanvas.height = img.height;
+    if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
+        console.error("redrawImage: Invalid canvas dimensions", fullResCanvas.width, fullResCanvas.height);
+        showLoadingIndicator(false);
+        return Promise.reject("Invalid canvas dimensions");
+    }
+    fullResCtx.clearRect(0, 0, fullResCanvas.width, fullResCanvas.height);
+    fullResCtx.drawImage(img, 0, 0, fullResCanvas.width, fullResCanvas.height);
+    applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
     const scaleFactor = 1;
-
-    return applyAdvancedFilters(state.fullResCtx, state.fullResCanvas, state.settings, state.noiseSeed, scaleFactor)
-        .then(() => applyGlitchEffects(state.fullResCtx, state.fullResCanvas, state.settings, state.noiseSeed, scaleFactor))
-        .then(() => applyComplexFilters(state.fullResCtx, state.fullResCanvas, state.settings, state.noiseSeed, scaleFactor))
+    return applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor)
+        .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
+        .then(() => applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, scaleFactor))
         .then(() => {
-            const ctx = state.canvas.getContext('2d');
-            ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
-            if (state.isShowingOriginal && state.trueOriginalImage.complete && state.trueOriginalImage.naturalWidth !== 0) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (isShowingOriginal && trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(state.trueOriginalImage, 0, 0, state.canvas.width, state.canvas.height);
+                ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
             } else {
-                if (state.fullResCanvas.width === 0 || state.fullResCanvas.height === 0) {
+                if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
                     showLoadingIndicator(false);
                     return;
                 }
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(state.fullResCanvas, 0, 0, state.canvas.width, state.canvas.height);
+                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
             }
-            if (state.modal.style.display === 'block') {
-                state.modalImage.src = state.canvas.toDataURL('image/png');
+            if (modal.style.display === 'block') {
+                modalImage.src = canvas.toDataURL('image/png');
             }
-            if (saveState) saveImageState(state);
+            if (saveState && saveImageStateCallback) {
+                saveImageStateCallback();
+            }
             showLoadingIndicator(false);
-        })
-        .catch(err => {
-            console.error('Redraw error:', err);
+        }).catch(err => {
+            console.error("redrawImage failed during processing:", err);
             showLoadingIndicator(false);
-            throw err;
+            throw err; // Re-throw to propagate the error
         });
 }
 
@@ -415,4 +420,4 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
-export { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters };
+export { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage };
