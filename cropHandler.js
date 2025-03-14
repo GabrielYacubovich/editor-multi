@@ -34,16 +34,22 @@ function showCropModal(dataURL = null) {
             if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
             else cropImage.onload = resolve;
         }).then(() => {
-                cropImage.src = tempCanvas.toDataURL('image/png');
-                return new Promise((resolve) => {
-                    if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
-                    else cropImage.onload = resolve;
-                }).then(() => {
-                    rotation = initialRotation;
-                    setupCropControls(null);
-                    drawCropOverlay();
-                });
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = cropImage.width;
+            tempCanvas.height = cropImage.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(cropImage, 0, 0);
+            // Apply any necessary processing here, e.g., filters
+            cropImage.src = tempCanvas.toDataURL('image/png');
+            return new Promise((resolve) => {
+                if (cropImage.complete && cropImage.naturalWidth !== 0) resolve();
+                else cropImage.onload = resolve;
+            }).then(() => {
+                rotation = initialRotation;
+                setupCropControls(null);
+                drawCropOverlay();
             });
+        });
     } else {
         // New image uploaded
         originalUploadedImage.src = dataURL;
