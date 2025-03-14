@@ -230,8 +230,11 @@ if (window.Worker) {
         };
     `], { type: 'application/javascript' })));
 
-    redrawWorker.onmessage = (e) => {
-        ctx.putImageData(e.data.imageData, 0, 0);
+    redrawWorker.onmessage = function(e) {
+        const { imageData } = e.data;
+        ctx.putImageData(imageData, 0, 0);
+        fullResCtx.putImageData(imageData, 0, 0);
+        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         canvas.style.display = 'block';
         showLoadingIndicator(false);
@@ -339,6 +342,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up file upload trigger function
     setTriggerFileUpload(triggerFileUpload);
+
+    // Initialize controls
+    let isDraggingSlider = false;
+    let tempSettings = {};
+
+    controls.forEach(control => {
+        control.addEventListener('touchstart', () => {
+            isDraggingSlider = true;
+            tempSettings = { ...settings };
+        }, { passive: true });
+
+        control.addEventListener('mousedown', () => {
+            isDraggingSlider = true;
+            tempSettings = { ...settings };
+        });
+
+        control.addEventListener('input', (e) => {
+            const id = e.target.id;
+            const newValue = parseInt(e.target.value);
+            if (isDraggingSlider) {
+                tempSettings[id] = newValue;
+            } else {
+                if (settings[id] !== newValue) {
+                    settings[id] = newValue;
+                    updateControlIndicators();
+                    if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                        lastAppliedEffect = id;
+                    }
+                    saveImageState();
+                }
+            }
+            updateControlIndicators();
+        });
+
+        control.addEventListener('mouseup', () => {
+            if (isDraggingSlider) {
+                isDraggingSlider = false;
+                const id = control.id;
+                if (settings[id] !== tempSettings[id]) {
+                    settings[id] = tempSettings[id];
+                    updateControlIndicators();
+                    if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                        lastAppliedEffect = id;
+                    }
+                    if (img.complete && img.naturalWidth !== 0) {
+                        redrawImage(
+                            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                        );
+                    }
+                }
+            }
+        });
+
+        control.addEventListener('touchend', () => {
+            if (isDraggingSlider) {
+                isDraggingSlider = false;
+                const id = control.id;
+                if (settings[id] !== tempSettings[id]) {
+                    settings[id] = tempSettings[id];
+                    updateControlIndicators();
+                    if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                        lastAppliedEffect = id;
+                    }
+                    if (img.complete && img.naturalWidth !== 0) {
+                        redrawImage(
+                            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                        );
+                    }
+                }
+            }
+        });
+
+        control.addEventListener('change', (e) => {
+            if (!isDraggingSlider) {
+                const id = e.target.id;
+                const newValue = parseInt(e.target.value);
+                if (settings[id] !== newValue) {
+                    settings[id] = newValue;
+                    updateControlIndicators();
+                    if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                        lastAppliedEffect = id;
+                    }
+                    if (img.complete && img.naturalWidth !== 0) {
+                        redrawImage(
+                            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                        );
+                    }
+                }
+            }
+        });
+    });
+
+    // Initialize the application
+    initialize();
 });
 
 uploadNewPhotoButton.addEventListener('click', (e) => {
@@ -349,24 +449,6 @@ uploadNewPhotoButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     triggerFileUpload();
 });
-
-function updateControlIndicators() {
-    const controlValues = [
-        'brightness', 'contrast', 'grayscale', 'vibrance', 'highlights', 'shadows',
-        'noise', 'exposure', 'temperature', 'saturation',
-        'glitch-chromatic', 'glitch-rgb-split',
-        'glitch-chromatic-vertical', 'glitch-chromatic-diagonal',
-        'glitch-pixel-shuffle', 'glitch-wave',
-        'kaleidoscope-segments', 'kaleidoscope-offset',
-        'vortex-twist', 'edge-detect'
-    ];
-    controlValues.forEach(id => {
-        const indicator = document.getElementById(`${id}-value`);
-        if (indicator) {
-            indicator.textContent = id === 'kaleidoscope-segments' ? `${settings[id]}` : `${settings[id]}%`;
-        }
-    });
-}
 
 toggleOriginalButton.addEventListener('click', () => {
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
@@ -485,7 +567,6 @@ img.onload = function () {
         canvas.style.display = 'block';
     });
 };
-
 
 downloadButton.addEventListener('click', () => {
     const popup = document.createElement('div');
@@ -777,95 +858,6 @@ restoreButton.addEventListener('click', () => {
             ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         });
     }
-};
-
-
-
-let isDraggingSlider = false;
-let tempSettings = {};
-controls.forEach(control => {
-    control.addEventListener('touchstart', () => {
-        isDraggingSlider = true;
-        tempSettings = { ...settings };
-    }, { passive: true });
-    control.addEventListener('mousedown', () => {
-        isDraggingSlider = true;
-        tempSettings = { ...settings };
-    });
-    control.addEventListener('input', (e) => {
-        const id = e.target.id;
-        const newValue = parseInt(e.target.value);
-        if (isDraggingSlider) {
-            tempSettings[id] = newValue;
-        } else {
-            if (settings[id] !== newValue) {
-                settings[id] = newValue;
-                updateControlIndicators();
-                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
-                    lastAppliedEffect = id;
-                }
-                saveImageState();
-            }
-        }
-        updateControlIndicators();
-    });
-    control.addEventListener('mouseup', () => {
-        if (isDraggingSlider) {
-            isDraggingSlider = false;
-            const id = control.id;
-            if (settings[id] !== tempSettings[id]) {
-                settings[id] = tempSettings[id];
-                updateControlIndicators();
-                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
-                    lastAppliedEffect = id;
-                }
-                if (img.complete && img.naturalWidth !== 0) {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
-                }
-            }
-        }
-    });
-    control.addEventListener('touchend', () => {
-        if (isDraggingSlider) {
-            isDraggingSlider = false;
-            const id = control.id;
-            if (settings[id] !== tempSettings[id]) {
-                settings[id] = tempSettings[id];
-                updateControlIndicators();
-                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
-                    lastAppliedEffect = id;
-                }
-                if (img.complete && img.naturalWidth !== 0) {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
-                }
-            }
-        }
-    });
-    control.addEventListener('change', (e) => {
-        if (!isDraggingSlider) {
-            const id = e.target.id;
-            const newValue = parseInt(e.target.value);
-            if (settings[id] !== newValue) {
-                settings[id] = newValue;
-                updateControlIndicators();
-                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
-                    lastAppliedEffect = id;
-                }
-                if (img.complete && img.naturalWidth !== 0) {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
-                }
-            }
-        }
-    });
 });
 
 canvas.addEventListener('click', (e) => {
@@ -920,12 +912,6 @@ canvas.addEventListener('touchend', (e) => {
     }
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    isTriggering = false;
-    cleanupFileInput();
-    updateControlIndicators(); // Ensure indicators are set on load
-});
-
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const modals = [modal, cropModal, previewModal];
@@ -949,6 +935,55 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+function initialize() {
+    isTriggering = false;
+    cleanupFileInput();
+    updateControlIndicators();
+    
+    // Initialize settings
+    const defaultSettings = {
+        brightness: 100,
+        contrast: 100,
+        grayscale: 0,
+        vibrance: 100,
+        highlights: 100,
+        shadows: 100,
+        noise: 0,
+        exposure: 100,
+        temperature: 100,
+        saturation: 100,
+        'glitch-chromatic': 0,
+        'glitch-rgb-split': 0,
+        'glitch-chromatic-vertical': 0,
+        'glitch-chromatic-diagonal': 0,
+        'glitch-pixel-shuffle': 0,
+        'glitch-wave': 0,
+        'kaleidoscope-segments': 0,
+        'kaleidoscope-offset': 0,
+        'vortex-twist': 0,
+        'edge-detect': 0
+    };
+    
+    Object.assign(settings, defaultSettings);
+    document.querySelectorAll('.controls input').forEach(input => {
+        input.value = settings[input.id];
+    });
+    updateControlIndicators();
+    
+    if (fullResCanvas && img.complete && img.naturalWidth !== 0) {
+        fullResCanvas.width = originalWidth;
+        fullResCanvas.height = originalHeight;
+        fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+        ).then(() => {
+            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+            ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+        });
+    }
+}
+
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -961,7 +996,20 @@ function debounce(func, wait) {
     };
 }
 
-function initialize() {
-    updateControlIndicators();
+function updateControlIndicators() {
+    const controlValues = [
+        'brightness', 'contrast', 'grayscale', 'vibrance', 'highlights', 'shadows',
+        'noise', 'exposure', 'temperature', 'saturation',
+        'glitch-chromatic', 'glitch-rgb-split',
+        'glitch-chromatic-vertical', 'glitch-chromatic-diagonal',
+        'glitch-pixel-shuffle', 'glitch-wave',
+        'kaleidoscope-segments', 'kaleidoscope-offset',
+        'vortex-twist', 'edge-detect'
+    ];
+    controlValues.forEach(id => {
+        const indicator = document.getElementById(`${id}-value`);
+        if (indicator) {
+            indicator.textContent = id === 'kaleidoscope-segments' ? `${settings[id]}` : `${settings[id]}%`;
+        }
+    });
 }
-initialize();
