@@ -319,7 +319,6 @@ function updateControlIndicators() {
 }
 
 toggleOriginalButton.addEventListener('click', () => {
-    console.log("Toggle clicked, trueOriginalImage complete:", trueOriginalImage.complete, "naturalWidth:", trueOriginalImage.naturalWidth);
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
         console.error("Cannot toggle: Original image is not loaded");
         return;
@@ -331,7 +330,26 @@ toggleOriginalButton.addEventListener('click', () => {
         isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
     ).catch(err => {
         console.error("Toggle redraw failed:", err);
-        isShowingOriginal = !isShowingOriginal; // Revert on failure
+        isShowingOriginal = !isShowingOriginal;
+        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    });
+});
+
+// Touchend listener
+toggleOriginalButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image not loaded");
+        return;
+    }
+    isShowingOriginal = !isShowingOriginal;
+    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+    ).catch(err => {
+        console.error("Toggle redraw failed:", err);
+        isShowingOriginal = !isShowingOriginal;
         toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
 });
@@ -420,7 +438,6 @@ img.onload = function () {
 
 
 downloadButton.addEventListener('click', () => {
-    const isEdited = Object.values(settings).some(value => value !== 100 && value !== 0);
     const popup = document.createElement('div');
     popup.style.position = 'fixed';
     popup.style.top = '50%';
@@ -475,12 +492,11 @@ downloadButton.addEventListener('click', () => {
     const fileTypeSelect = document.getElementById('save-file-type');
     const dimensionsSpan = document.getElementById('dimensions');
     const fileSizeSpan = document.getElementById('file-size');
-    const originalDataURL = originalUploadedImage.src || fullResCanvas.toDataURL('image/png'); // Fallback to fullResCanvas
 
     function updateFileInfo() {
         const scale = parseFloat(resolutionSelect.value) / 100;
-        const width = Math.round((originalWidth || fullResCanvas.width || 1) * scale);
-        const height = Math.round((originalHeight || fullResCanvas.height || 1) * scale);
+        const width = Math.round(fullResCanvas.width * scale);
+        const height = Math.round(fullResCanvas.height * scale);
         dimensionsSpan.textContent = `${width} x ${height}`;
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
@@ -488,7 +504,7 @@ downloadButton.addEventListener('click', () => {
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
-        tempCtx.drawImage(fullResCanvas, 0, 0, width, height); // Use fullResCanvas for consistency
+        tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
         const fileType = fileTypeSelect.value;
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
@@ -509,9 +525,8 @@ downloadButton.addEventListener('click', () => {
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_]/g, '');
         const extension = fileType.split('/')[1];
 
-        // Check if fullResCanvas has valid content
         if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
-            console.error("No valid image data available for download. Please upload an image first.");
+            console.error("No valid image data available for download.");
             alert("No image available to download. Please upload an image.");
             document.body.removeChild(popup);
             document.body.removeChild(overlay);
@@ -519,63 +534,40 @@ downloadButton.addEventListener('click', () => {
         }
 
         showLoadingIndicator(true);
-        const width = Math.round((originalWidth || fullResCanvas.width) * scale);
-        const height = Math.round((originalHeight || fullResCanvas.height) * scale);
+        const width = Math.round(fullResCanvas.width * scale);
+        const height = Math.round(fullResCanvas.height * scale);
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
         tempCanvas.height = height;
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
+        tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
 
-        if (!isEdited && scale === 1.0 && originalUploadedImage.complete && originalUploadedImage.naturalWidth !== 0) {
-            const link = document.createElement('a');
-            link.download = `${sanitizedFileName}.${extension}`;
-            link.href = originalDataURL;
-            link.click();
-            showLoadingIndicator(false);
-            document.body.removeChild(popup);
-            document.body.removeChild(overlay);
-            return;
-        }
-
-        // Ensure img is loaded or use fullResCanvas directly
-        const sourceImage = (img.complete && img.naturalWidth !== 0) ? img : fullResCanvas;
-        redrawImage(
-            ctx, canvas, fullResCanvas, fullResCtx, sourceImage, settings, noiseSeed,
-            isShowingOriginal, trueOriginalImage, modal, modalImage, false
-        ).then(() => {
-            tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
-            const quality = fileType === 'image/png' ? undefined : 1.0;
-            tempCanvas.toBlob((blob) => {
-                if (!blob || blob.size === 0) {
-                    console.error("Generated blob is empty");
-                    alert("Failed to generate downloadable image.");
-                    showLoadingIndicator(false);
-                    return;
-                }
-                const link = document.createElement('a');
-                link.download = `${sanitizedFileName}-${Math.round(scale * 100)}%.${extension}`;
-                link.href = URL.createObjectURL(blob);
-                link.click();
-                URL.revokeObjectURL(link.href);
+        const quality = fileType === 'image/png' ? undefined : 1.0;
+        tempCanvas.toBlob((blob) => {
+            if (!blob || blob.size === 0) {
+                console.error("Generated blob is empty");
+                alert("Failed to generate downloadable image.");
                 showLoadingIndicator(false);
-                document.body.removeChild(popup);
-                document.body.removeChild(overlay);
-            }, fileType, quality);
-        }).catch(error => {
-            console.error("Download failed:", error);
-            alert("An error occurred while processing the image.");
+                return;
+            }
+            const link = document.createElement('a');
+            link.download = `${sanitizedFileName}-${Math.round(scale * 100)}%.${extension}`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            URL.revokeObjectURL(link.href);
             showLoadingIndicator(false);
             document.body.removeChild(popup);
             document.body.removeChild(overlay);
-        });
+        }, fileType, quality);
     });
 
     saveCancelBtn.addEventListener('click', () => {
         document.body.removeChild(popup);
         document.body.removeChild(overlay);
     });
+
     overlay.addEventListener('click', () => {
         document.body.removeChild(popup);
         document.body.removeChild(overlay);

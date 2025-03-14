@@ -183,7 +183,7 @@ function setupCropControls() {
             return;
         }
         closeModal(cropModal);
-        showLoadingIndicator(true); // Show loading while processing
+        showLoadingIndicator(true);
     
         const origWidth = cropImage.width;
         const origHeight = cropImage.height;
@@ -201,8 +201,7 @@ function setupCropControls() {
         fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
         fullRotatedCtx.rotate(angleRad);
         fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
-        const sourceImage = trueOriginalImage;
-        fullRotatedCtx.drawImage(sourceImage, 0, 0, origWidth, origHeight);
+        fullRotatedCtx.drawImage(trueOriginalImage, 0, 0, origWidth, origHeight);
     
         const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
         const cropX = cropRect.x / scaleFactor;
@@ -221,35 +220,35 @@ function setupCropControls() {
             0, 0, cropWidth, cropHeight
         );
     
-        if (redrawWorker) { // Use the imported redrawWorker directly
+        // Update img and originals
+        img.src = tempCanvas.toDataURL('image/png');
+        originalUploadedImage.src = img.src;
+        trueOriginalImage.src = img.src;
+    
+        // Update fullResCanvas dimensions and redraw with filters
+        fullResCanvas.width = cropWidth;
+        fullResCanvas.height = cropHeight;
+        fullResCtx.drawImage(tempCanvas, 0, 0);
+    
+        if (redrawWorker) {
             const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
             redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
+            redrawWorker.onmessage = (e) => {
+                fullResCtx.putImageData(e.data.imageData, 0, 0);
+                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                showLoadingIndicator(false);
+            };
         } else {
-            // Fallback: Use requestAnimationFrame to split work
-            requestAnimationFrame(() => {
-                img.src = tempCanvas.toDataURL('image/png');
-                originalUploadedImage.src = img.src;
-                trueOriginalImage.src = img.src;
-                trueOriginalImage.onload = () => {
-                    originalWidth = cropWidth;
-                    originalHeight = cropHeight;
-                    fullResCanvas.width = originalWidth;
-                    fullResCanvas.height = originalHeight;
-                    fullResCtx.drawImage(tempCanvas, 0, 0);
-                    canvas.width = Math.round(previewWidth);
-                    canvas.height = Math.round(previewHeight);
-                    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState)
-                        .then(() => {
-                            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                            canvas.style.display = 'block';
-                            showLoadingIndicator(false);
-                        })
-                        .catch(err => {
-                            console.error("Redraw failed in fallback:", err);
-                            canvas.style.display = 'block';
-                            showLoadingIndicator(false);
-                        });
-                };
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+            ).then(() => {
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                showLoadingIndicator(false);
+            }).catch(err => {
+                console.error("Redraw failed in fallback:", err);
+                showLoadingIndicator(false);
             });
         }
     
