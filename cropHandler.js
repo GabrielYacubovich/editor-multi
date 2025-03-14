@@ -30,8 +30,46 @@ export function initializeCropHandler(options) {
     setupModal(cropModal, false);
 }
 
-// ... (showCropModal unchanged)
+export function showCropModal(imageSrc) {
+    if (!imageSrc || typeof imageSrc !== 'string' || imageSrc.trim() === '') {
+        console.error("showCropModal: Invalid or missing imageSrc", imageSrc);
+        return;
+    }
+    cropImage.src = imageSrc;
+    cropImage.onload = () => {
+        const displayWidth = Math.min(cropImage.width, window.innerWidth * 0.8);
+        const displayHeight = Math.min(cropImage.height, window.innerHeight * 0.8 - 100);
+        const scale = Math.min(displayWidth / cropImage.width, displayHeight / cropImage.height);
+        const canvasWidth = cropImage.width * scale;
+        const canvasHeight = cropImage.height * scale;
 
+        cropCanvas.width = canvasWidth;
+        cropCanvas.height = canvasHeight;
+        cropCanvas.dataset.scaleFactor = scale;
+
+        // Set original state (full image, no rotation)
+        originalCropRect = { x: 0, y: 0, width: cropImage.width, height: cropImage.height };
+        originalRotation = 0;
+
+        // Set initial crop rect (can be adjusted later)
+        cropRect = {
+            x: canvasWidth * 0.1,
+            y: canvasHeight * 0.1,
+            width: canvasWidth * 0.8,
+            height: canvasHeight * 0.8
+        };
+        initialCropRect = { ...cropRect }; // Initial state matches first display
+        initialRotation = 0;
+
+        rotation = 0;
+        drawCropOverlay();
+        cropModal.style.display = 'block';
+        setupCropControls();
+    };
+    cropImage.onerror = () => {
+        console.error("Failed to load cropImage with src:", imageSrc);
+    };
+}
 function setupCropControls() {
     const cropControls = document.getElementById('crop-controls');
     cropControls.innerHTML = `
