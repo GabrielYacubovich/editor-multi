@@ -1,63 +1,82 @@
-
 // domUtils.js
-function closeModal(modalElement) {
+const modalListeners = new Map();
+
+export function closeModal(modalElement) {
     modalElement.style.display = 'none';
     if (modalElement.id === 'crop-modal') {
-        // Crop-specific logic to be moved to cropHandler.js later
-        document.getElementById('upload-new-photo').style.display = 'block';
+        const uploadButton = document.getElementById('upload-new-photo');
+        if (uploadButton) uploadButton.style.display = 'block';
     }
     if (modalElement.id === 'image-modal') {
-        document.getElementById('modal-controls').innerHTML = '';
+        const modalControls = document.getElementById('modal-controls');
+        if (modalControls) modalControls.innerHTML = '';
     }
 }
 
-function setupModal(modalElement, allowOutsideClick = false) {
+export function setupModal(modalElement, allowOutsideClick = false) {
     const closeBtn = modalElement.querySelector('.modal-close-btn');
     if (closeBtn) {
-        closeBtn.removeEventListener('click', closeModalHandler);
-        closeBtn.addEventListener('click', closeModalHandler);
+        if (modalListeners.has(closeBtn)) {
+            closeBtn.removeEventListener('click', modalListeners.get(closeBtn));
+        }
+        const handler = () => closeModal(modalElement);
+        closeBtn.addEventListener('click', handler);
+        modalListeners.set(closeBtn, handler);
     }
     if (allowOutsideClick) {
-        modalElement.removeEventListener('click', outsideClickHandler);
-        modalElement.addEventListener('click', outsideClickHandler);
+        if (modalListeners.has(modalElement)) {
+            modalElement.removeEventListener('click', modalListeners.get(modalElement));
+        }
+        const handler = (e) => { if (e.target === modalElement) closeModal(modalElement); };
+        modalElement.addEventListener('click', handler);
+        modalListeners.set(modalElement, handler);
     }
 }
 
-function closeModalHandler() {
-    const modal = this.closest('.modal');
-    closeModal(modal);
-}
-
-function outsideClickHandler(e) {
-    if (e.target === this) {
-        closeModal(this);
+export function showLoadingIndicator(show = true) {
+    let loading = document.getElementById('loading-indicator');
+    if (!loading && show) {
+        loading = document.createElement('div');
+        loading.id = 'loading-indicator';
+        loading.style.position = 'absolute';
+        loading.style.bottom = '10px';
+        loading.style.left = '50%';
+        loading.style.transform = 'translateX(-50%)';
+        loading.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        loading.style.color = 'white';
+        loading.style.padding = '10px 20px';
+        loading.style.borderRadius = '5px';
+        loading.style.zIndex = '1003';
+        loading.textContent = 'Rendering...';
+        document.body.appendChild(loading);
+    }
+    if (loading) {
+        loading.style.display = show ? 'block' : 'none';
+        if (show) {
+            const canvas = document.getElementById('canvas');
+            if (canvas) {
+                const canvasRect = canvas.getBoundingClientRect();
+                loading.style.left = `${canvasRect.left + canvasRect.width / 2}px`;
+                loading.style.top = `${canvasRect.bottom + 10}px`;
+            }
+        }
     }
 }
 
-function showLoadingIndicator(show = true) {
-    const loading = document.getElementById('loading-indicator');
-    if (!loading) {
-        const div = document.createElement('div');
-        div.id = 'loading-indicator';
-        div.style.position = 'absolute';
-        div.style.bottom = '10px';
-        div.style.left = '50%';
-        div.style.transform = 'translateX(-50%)';
-        div.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        div.style.color = 'white';
-        div.style.padding = '10px 20px';
-        div.style.borderRadius = '5px';
-        div.style.zIndex = '1003';
-        div.textContent = 'Rendering...';
-        document.body.appendChild(div);
-    }
-    loading.style.display = show ? 'block' : 'none';
-    if (show && document.getElementById('canvas')) {
-        const canvas = document.getElementById('canvas');
-        const canvasRect = canvas.getBoundingClientRect();
-        loading.style.left = `${canvasRect.left + canvasRect.width / 2}px`;
-        loading.style.top = `${canvasRect.bottom + 10}px`;
-    }
+export function updateControlIndicators(settings) {
+    const controlValues = [
+        'brightness', 'contrast', 'grayscale', 'vibrance', 'highlights', 'shadows',
+        'noise', 'exposure', 'temperature', 'saturation',
+        'glitch-chromatic', 'glitch-rgb-split',
+        'glitch-chromatic-vertical', 'glitch-chromatic-diagonal',
+        'glitch-pixel-shuffle', 'glitch-wave',
+        'kaleidoscope-segments', 'kaleidoscope-offset',
+        'vortex-twist', 'edge-detect'
+    ];
+    controlValues.forEach(id => {
+        const indicator = document.getElementById(`${id}-value`);
+        if (indicator) {
+            indicator.textContent = id === 'kaleidoscope-segments' ? `${settings[id]}` : `${settings[id]}%`;
+        }
+    });
 }
-
-export { closeModal, setupModal, showLoadingIndicator };

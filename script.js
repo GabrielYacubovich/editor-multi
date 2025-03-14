@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
         trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
         settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-        previewWidth, previewHeight, uploadNewPhotoButton // Add this
+        previewWidth, previewHeight, uploadNewPhotoButton
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
@@ -489,10 +489,9 @@ function handleUndo(e) {
         });
         updateControlIndicators();
 
-        // Verify img is valid
         if (!img || !img.complete || img.naturalWidth === 0) {
             console.error("handleUndo: img is invalid", img);
-            return; // Exit early if img isn’t ready
+            return;
         }
 
         console.log("handleUndo - Applying previous settings:", settings);
@@ -520,7 +519,6 @@ function handleRedo(e) {
         });
         updateControlIndicators();
         
-        // Use cropImage if crop modal is open, otherwise use img
         const activeImage = (cropModal.style.display === 'block' && cropImage.complete && cropImage.naturalWidth !== 0) ? cropImage : img;
         if (!activeImage || !activeImage.complete || activeImage.naturalWidth === 0) {
             console.error("handleRedo: No valid image available", activeImage);
@@ -732,21 +730,39 @@ canvas.addEventListener('click', (e) => {
         try {
             const controlsContainer = document.querySelector('.controls');
             const modalControls = document.getElementById('modal-controls');
-            if (!controlsContainer || !modalControls) return;
+            if (!controlsContainer || !modalControls) {
+                console.error("Controls container or modal controls not found");
+                return;
+            }
             const clonedControls = controlsContainer.cloneNode(true);
             modalControls.innerHTML = '';
             modalControls.appendChild(clonedControls);
-            modalImage.src = canvas.toDataURL('image/png');
+
+            // Sync modal inputs with current settings
             const modalInputs = modalControls.querySelectorAll('input[type="range"]');
             modalInputs.forEach(input => {
+                input.value = settings[input.id];
                 input.addEventListener('input', debounce((e) => {
                     const id = e.target.id;
-                    settings[id] = parseInt(e.target.value);
+                    const newValue = parseInt(e.target.value);
+                    settings[id] = newValue;
                     updateControlIndicators();
-                    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true);
+                    redrawImage(
+                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                    ).catch(err => {
+                        console.error("Modal redraw failed:", err);
+                    });
                 }, 300));
             });
+
+            modalImage.src = canvas.toDataURL('image/png');
             modal.style.display = 'block';
+
+            const modalCloseBtn = modal.querySelector('.modal-close-btn');
+            if (modalCloseBtn) {
+                modalCloseBtn.focus();
+            }
         } catch (error) {
             console.error("Error opening modal:", error);
         }
@@ -756,12 +772,14 @@ canvas.addEventListener('click', (e) => {
 canvas.addEventListener('touchend', (e) => {
     if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
         e.preventDefault();
+        // Optional: Add touch-specific behavior here if desired
     }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
     isTriggering = false;
     cleanupFileInput();
+    updateControlIndicators(); // Ensure indicators are set on load
 });
 
 document.addEventListener('keydown', (e) => {
@@ -803,7 +821,3 @@ function initialize() {
     updateControlIndicators();
 }
 initialize();
-
-
-
-
