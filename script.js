@@ -1,36 +1,29 @@
-// Initialize UI elements
+// script.js
+import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
+import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
+import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
+
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
-const fullResCanvas = document.createElement('canvas');
-const fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
-const modal = document.getElementById('modal');
-const previewModal = document.getElementById('preview-modal');
-const downloadButton = document.getElementById('download');
-const undoButton = document.getElementById('undo-button');
-const redoButton = document.getElementById('redo-button');
 const controls = document.querySelectorAll('.controls input');
-const uploadNewPhotoButton = document.getElementById('upload-new-photo');
-const cropImageButton = document.getElementById('crop-image-button');
+const undoButton = document.getElementById('undo');
+const redoButton = document.getElementById('redo');
 const restoreButton = document.getElementById('restore');
+const downloadButton = document.getElementById('download');
+const cropImageButton = document.getElementById('crop-image-button');
+const uploadNewPhotoButton = document.getElementById('upload-new-photo');
 const toggleOriginalButton = document.getElementById('toggle-original');
+const modal = document.getElementById('image-modal');
 const modalImage = document.getElementById('modal-image');
 const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
 const cropCtx = cropCanvas.getContext('2d');
-
-// Add event listeners for undo/redo
-if (undoButton && redoButton) {
-    undoButton.addEventListener('click', undoChange);
-    redoButton.addEventListener('click', redoChange);
-}
-
-import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
-import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
-import { initializeCropHandler, showCropModal, setTriggerFileUpload } from './cropHandler.js';
-
+const previewModal = document.getElementById('preview-modal');
 let img = new Image();
 let originalImageData = null;
 let noiseSeed = Math.random();
+let fullResCanvas = document.createElement('canvas');
+let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
 let isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
@@ -57,27 +50,13 @@ let settings = {
     'vortex-twist': 0,
     'edge-detect': 0
 };
-let imageStates = [];
-let currentStateIndex = -1;
+let history = [{ filters: { ...settings }, imageData: null }];
+let redoHistory = [];
 let lastAppliedEffect = null;
 let originalWidth, originalHeight, previewWidth, previewHeight;
 
 let isTriggering = false;
 let fileInput = null;
-
-let cropImage = new Image();
-let rotation = 0;
-let cropRect = { x: 0, y: 0, width: 0, height: 0 };
-let originalCropRect = { ...cropRect };
-let initialCropRect = { ...cropRect };
-let originalRotation = rotation;
-let initialRotation = rotation;
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragStartCropRect = { ...cropRect };
-let isResizing = false;
-let resizeHandle = '';
 
 export let redrawWorker;
 if (window.Worker) {
@@ -251,152 +230,41 @@ if (window.Worker) {
         };
     `], { type: 'application/javascript' })));
 
-    redrawWorker.onmessage = function(e) {
-        const { imageData } = e.data;
-        ctx.putImageData(imageData, 0, 0);
-        fullResCtx.putImageData(imageData, 0, 0);
-        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+    redrawWorker.onmessage = (e) => {
+        ctx.putImageData(e.data.imageData, 0, 0);
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         canvas.style.display = 'block';
         showLoadingIndicator(false);
     };
 }
 
-// Undo/Redo functionality
-let undoStack = [];
-let redoStack = [];
-
-function saveImageState() {
-    const currentState = {
-        imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-        settings: { ...settings }
-    };
-    undoStack.push(currentState);
-    redoStack = []; // Clear redo stack when new change is made
-    updateUndoRedoButtons();
-}
-
-function undoChange() {
-    if (undoStack.length > 0) {
-        const currentState = {
-            imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-            settings: { ...settings }
-        };
-        redoStack.push(currentState);
-        
-        const previousState = undoStack.pop();
-        canvas.width = previousState.imageData.width;
-        canvas.height = previousState.imageData.height;
-        ctx.putImageData(previousState.imageData, 0, 0);
-        settings = { ...previousState.settings };
-        updateSliderValues();
-        updateUndoRedoButtons();
-    }
-}
-
-function redoChange() {
-    if (redoStack.length > 0) {
-        const currentState = {
-            imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-            settings: { ...settings }
-        };
-        undoStack.push(currentState);
-        
-        const nextState = redoStack.pop();
-        canvas.width = nextState.imageData.width;
-        canvas.height = nextState.imageData.height;
-        ctx.putImageData(nextState.imageData, 0, 0);
-        settings = { ...nextState.settings };
-        updateSliderValues();
-        updateUndoRedoButtons();
-    }
-}
-
-function updateUndoRedoButtons() {
-    const undoButton = document.getElementById('undo-button');
-    const redoButton = document.getElementById('redo-button');
-    
-    if (undoButton) {
-        undoButton.classList.toggle('disabled', undoStack.length === 0);
-    }
-    if (redoButton) {
-        redoButton.classList.toggle('disabled', redoStack.length === 0);
-    }
-}
-
-function updateSliderValues() {
-    controls.forEach(input => {
-        if (input.id in settings) {
-            input.value = settings[input.id];
-            const output = input.parentElement.querySelector('.slider-value');
-            if (output) {
-                output.textContent = settings[input.id];
-            }
-        }
-    });
-}
-
 function triggerFileUpload() {
-    if (isTriggering) return;
     isTriggering = true;
-
-    cleanupFileInput();
     fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
     fileInput.style.display = 'none';
     document.body.appendChild(fileInput);
 
-    fileInput.addEventListener('change', function(e) {
+    fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                img = new Image();
-                img.onload = function() {
-                    originalWidth = img.naturalWidth;
-                    originalHeight = img.naturalHeight;
-                    
-                    // Set up preview dimensions
-                    const maxPreviewDimension = 800;
-                    const aspectRatio = originalWidth / originalHeight;
-                    if (aspectRatio > 1) {
-                        previewWidth = Math.min(maxPreviewDimension, originalWidth);
-                        previewHeight = previewWidth / aspectRatio;
-                    } else {
-                        previewHeight = Math.min(maxPreviewDimension, originalHeight);
-                        previewWidth = previewHeight * aspectRatio;
-                    }
-
-                    canvas.width = previewWidth;
-                    canvas.height = previewHeight;
-                    fullResCanvas.width = originalWidth;
-                    fullResCanvas.height = originalHeight;
-
-                    // Draw image at both resolutions
-                    ctx.drawImage(img, 0, 0, previewWidth, previewHeight);
-                    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-
-                    // Store original images
-                    trueOriginalImage.src = event.target.result;
-                    originalUploadedImage.src = event.target.result;
-                    originalFullResImage.src = event.target.result;
-
-                    // Save initial state and show crop modal
-                    originalImageData = ctx.getImageData(0, 0, previewWidth, previewHeight);
-                    saveImageState();
-                    showCropModal(img);
-                };
-                img.src = event.target.result;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            trueOriginalImage.src = event.target.result;
+            trueOriginalImage.onload = () => { // Ensure it’s loaded
+                originalUploadedImage.src = event.target.result;
+                showCropModal(event.target.result);
             };
-            reader.readAsDataURL(file);
-        }
-        cleanupFileInput();
+            cleanupFileInput();
+        };
+        reader.onerror = cleanupFileInput;
+        reader.readAsDataURL(file);
     });
-
-    fileInput.click();
+    setTimeout(() => fileInput.click(), 0);
     setTimeout(() => {
-        isTriggering = false;
+        if (isTriggering && fileInput && document.body.contains(fileInput)) {
+            cleanupFileInput();
+        }
     }, 1000);
 }
 
@@ -405,108 +273,98 @@ function cleanupFileInput() {
         document.body.removeChild(fileInput);
     }
     fileInput = null;
+    isTriggering = false;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    setupModal(modal, false);
+    setupModal(cropModal, false);
+    setupModal(previewModal, true);
     initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx,
-        img, trueOriginalImage, originalUploadedImage, originalFullResImage,
-        modal, modalImage, settings, noiseSeed, isShowingOriginal,
-        originalWidth, originalHeight, previewWidth, previewHeight,
-        uploadNewPhotoButton, saveImageState, originalImageData,
-        rotation, cropRect, originalCropRect, initialCropRect,
-        originalRotation, initialRotation, isDragging,
-        dragStartX, dragStartY, dragStartCropRect,
-        isResizing, resizeHandle, cropImage
+        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
+        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
+        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
+        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData,
+        redrawWorker // Add redrawWorker here
     });
-
-    // Set up the triggerFileUpload function
     setTriggerFileUpload(triggerFileUpload);
-
-    // Add event listeners for upload and crop buttons
-    if (uploadNewPhotoButton) {
-        uploadNewPhotoButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (!isTriggering) {
-                triggerFileUpload();
-            }
-        });
-    }
-
-    if (cropImageButton) {
-        cropImageButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            showCropModal(img);
-        });
-    }
+    setupCropEventListeners();
 });
 
-controls.forEach(control => {
-    control.addEventListener('input', (e) => {
-        const id = e.target.id;
-        const newValue = parseInt(e.target.value);
-        settings[id] = newValue;
-        updateControlIndicators();
-        if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
-            lastAppliedEffect = id;
-        }
-        saveImageState();
-    });
+uploadNewPhotoButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    triggerFileUpload();
+});
+uploadNewPhotoButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    triggerFileUpload();
 });
 
-if (cropImageButton) {
-    cropImageButton.addEventListener('click', () => {
-        if (img.complete && img.naturalWidth !== 0) {
-            showCropModal(canvas.toDataURL('image/png'));
+function updateControlIndicators() {
+    const controlValues = [
+        'brightness', 'contrast', 'grayscale', 'vibrance', 'highlights', 'shadows',
+        'noise', 'exposure', 'temperature', 'saturation',
+        'glitch-chromatic', 'glitch-rgb-split',
+        'glitch-chromatic-vertical', 'glitch-chromatic-diagonal',
+        'glitch-pixel-shuffle', 'glitch-wave',
+        'kaleidoscope-segments', 'kaleidoscope-offset',
+        'vortex-twist', 'edge-detect'
+    ];
+    controlValues.forEach(id => {
+        const indicator = document.getElementById(`${id}-value`);
+        if (indicator) {
+            indicator.textContent = id === 'kaleidoscope-segments' ? `${settings[id]}` : `${settings[id]}%`;
         }
     });
 }
 
-if (restoreButton) {
-    restoreButton.addEventListener('click', () => {
-        settings = {
-            brightness: 100,
-            contrast: 100,
-            grayscale: 0,
-            vibrance: 100,
-            highlights: 100,
-            shadows: 100,
-            noise: 0,
-            exposure: 100,
-            temperature: 100,
-            saturation: 100,
-            'glitch-chromatic': 0,
-            'glitch-rgb-split': 0,
-            'glitch-chromatic-vertical': 0,
-            'glitch-chromatic-diagonal': 0,
-            'glitch-pixel-shuffle': 0,
-            'glitch-wave': 0,
-            'kaleidoscope-segments': 0,
-            'kaleidoscope-offset': 0,
-            'vortex-twist': 0,
-            'edge-detect': 0
-        };
-
-        document.querySelectorAll('.controls input').forEach(input => {
-            input.value = settings[input.id];
-        });
-        updateControlIndicators();
-
-        fullResCanvas.width = originalWidth;
-        fullResCanvas.height = originalHeight;
-        fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-
-        if (img.complete && img.naturalWidth !== 0) {
-            redrawImage(
-                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-            ).then(() => {
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-            });
-        }
+toggleOriginalButton.addEventListener('click', () => {
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image is not loaded");
+        return;
+    }
+    isShowingOriginal = !isShowingOriginal;
+    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+    ).catch(err => {
+        console.error("Toggle redraw failed:", err);
+        isShowingOriginal = !isShowingOriginal;
+        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
-}
+});
+
+// Touchend listener
+toggleOriginalButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image not loaded");
+        return;
+    }
+    isShowingOriginal = !isShowingOriginal;
+    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+    ).catch(err => {
+        console.error("Toggle redraw failed:", err);
+        isShowingOriginal = !isShowingOriginal;
+        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    });
+});
+
+// Update touchend listener similarly
+toggleOriginalButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image not loaded");
+        return;
+    }
+    isShowingOriginal = !isShowingOriginal;
+    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    ctx.drawImage(isShowingOriginal ? trueOriginalImage : fullResCanvas, 0, 0, canvas.width, canvas.height); // Direct draw instead of redrawImage
+});
 
 img.onload = function () {
     originalWidth = img.width;
@@ -572,8 +430,12 @@ img.onload = function () {
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         uploadNewPhotoButton.style.display = 'block';
         canvas.style.display = 'block';
+    }).catch(err => {
+        console.error("Failed to redraw image on load:", err);
+        canvas.style.display = 'block';
     });
 };
+
 
 downloadButton.addEventListener('click', () => {
     const popup = document.createElement('div');
@@ -664,6 +526,7 @@ downloadButton.addEventListener('click', () => {
         const extension = fileType.split('/')[1];
 
         if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
+            console.error("No valid image data available for download.");
             alert("No image available to download. Please upload an image.");
             document.body.removeChild(popup);
             document.body.removeChild(overlay);
@@ -684,6 +547,7 @@ downloadButton.addEventListener('click', () => {
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
             if (!blob || blob.size === 0) {
+                console.error("Generated blob is empty");
                 alert("Failed to generate downloadable image.");
                 showLoadingIndicator(false);
                 return;
@@ -711,11 +575,118 @@ downloadButton.addEventListener('click', () => {
 });
 
 let isRedrawing = false;
-function initialize() {
-    isTriggering = false;
-    cleanupFileInput();
-    updateControlIndicators();
-    
+function saveImageState(isOriginal = false) {
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    if (isOriginal) {
+        history = [{ filters: { ...settings }, imageData }];
+        redoHistory = [];
+        lastAppliedEffect = null;
+    } else {
+        const lastState = history[history.length - 1];
+        if (JSON.stringify(lastState.filters) !== JSON.stringify(settings)) {
+            history.push({ filters: { ...settings }, imageData });
+            if (history.length > 50) history.shift();
+            redoHistory = [];
+        }
+    }
+}
+
+function handleUndo(e) {
+    e.preventDefault();
+    if (history.length > 1) {
+        const currentState = history.pop();
+        redoHistory.push(currentState);
+        const previousState = history[history.length - 1];
+        Object.assign(settings, previousState.filters);
+        document.querySelectorAll('.controls input').forEach(input => {
+            input.value = settings[input.id];
+        });
+        updateControlIndicators();
+
+        if (!img || !img.complete || img.naturalWidth === 0) {
+            console.error("handleUndo: img is invalid", img);
+            return;
+        }
+
+        console.log("handleUndo - Applying previous settings:", settings);
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        ).then(() => {
+            console.log("Undo redraw completed successfully");
+        }).catch(err => {
+            console.error("Undo redraw failed:", err);
+        });
+    } else {
+        console.log("handleUndo: No previous state to undo");
+    }
+}
+
+function handleRedo(e) {
+    e.preventDefault();
+    if (redoHistory.length > 0) {
+        const nextState = redoHistory.pop();
+        history.push(nextState);
+        Object.assign(settings, nextState.filters);
+        document.querySelectorAll('.controls input').forEach(input => {
+            input.value = settings[input.id];
+        });
+        updateControlIndicators();
+        
+        const activeImage = (cropModal.style.display === 'block' && cropImage.complete && cropImage.naturalWidth !== 0) ? cropImage : img;
+        if (!activeImage || !activeImage.complete || activeImage.naturalWidth === 0) {
+            console.error("handleRedo: No valid image available", activeImage);
+            return;
+        }
+        
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, activeImage, settings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        ).catch(err => {
+            console.error("Redo failed:", err);
+        });
+    }
+}
+
+const debouncedUndo = debounce(handleUndo, 200);
+const debouncedRedo = debounce(handleRedo, 200);
+
+function addButtonListeners(button, handler) {
+    button.setAttribute('role', 'button');
+    button.addEventListener('click', handler);
+    button.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handler(e);
+    }, { passive: false });
+    button.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handler(e);
+    }, { passive: false });
+    button.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+}
+
+addButtonListeners(undoButton, debouncedUndo);
+addButtonListeners(redoButton, debouncedRedo);
+
+cropImageButton.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!img.src || img.src === "") {
+        return;
+    }
+    showCropModal();
+});
+
+cropImageButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!img.src || img.src === "") {
+        return;
+    }
+    showCropModal();
+});
+
+restoreButton.addEventListener('click', () => {
     settings = {
         brightness: 100,
         contrast: 100,
@@ -738,16 +709,14 @@ function initialize() {
         'vortex-twist': 0,
         'edge-detect': 0
     };
-    
     document.querySelectorAll('.controls input').forEach(input => {
         input.value = settings[input.id];
     });
     updateControlIndicators();
-    
-    if (fullResCanvas && img.complete && img.naturalWidth !== 0) {
-        fullResCanvas.width = originalWidth;
-        fullResCanvas.height = originalHeight;
-        fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
+    fullResCanvas.width = originalWidth;
+    fullResCanvas.height = originalHeight;
+    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
+    if (img.complete && img.naturalWidth !== 0) {
         redrawImage(
             ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
@@ -756,59 +725,95 @@ function initialize() {
             ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         });
     }
-}
+});
 
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
 
-function updateControlIndicators() {
-    const controlValues = [
-        'brightness', 'contrast', 'grayscale', 'vibrance', 'highlights', 'shadows',
-        'noise', 'exposure', 'temperature', 'saturation',
-        'glitch-chromatic', 'glitch-rgb-split',
-        'glitch-chromatic-vertical', 'glitch-chromatic-diagonal',
-        'glitch-pixel-shuffle', 'glitch-wave',
-        'kaleidoscope-segments', 'kaleidoscope-offset',
-        'vortex-twist', 'edge-detect'
-    ];
-    controlValues.forEach(id => {
-        const indicator = document.getElementById(`${id}-value`);
-        if (indicator) {
-            indicator.textContent = id === 'kaleidoscope-segments' ? `${settings[id]}` : `${settings[id]}%`;
+
+let isDraggingSlider = false;
+let tempSettings = {};
+controls.forEach(control => {
+    control.addEventListener('touchstart', () => {
+        isDraggingSlider = true;
+        tempSettings = { ...settings };
+    }, { passive: true });
+    control.addEventListener('mousedown', () => {
+        isDraggingSlider = true;
+        tempSettings = { ...settings };
+    });
+    control.addEventListener('input', (e) => {
+        const id = e.target.id;
+        const newValue = parseInt(e.target.value);
+        if (isDraggingSlider) {
+            tempSettings[id] = newValue;
+        } else {
+            if (settings[id] !== newValue) {
+                settings[id] = newValue;
+                updateControlIndicators();
+                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                    lastAppliedEffect = id;
+                }
+                saveImageState();
+            }
+        }
+        updateControlIndicators();
+    });
+    control.addEventListener('mouseup', () => {
+        if (isDraggingSlider) {
+            isDraggingSlider = false;
+            const id = control.id;
+            if (settings[id] !== tempSettings[id]) {
+                settings[id] = tempSettings[id];
+                updateControlIndicators();
+                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                    lastAppliedEffect = id;
+                }
+                if (img.complete && img.naturalWidth !== 0) {
+                    redrawImage(
+                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                    );
+                }
+            }
         }
     });
-}
-
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        const modals = [modal, cropModal, previewModal];
-        const openModal = modals.find(m => m.style.display === 'block');
-        if (openModal) {
-            closeModal(openModal);
+    control.addEventListener('touchend', () => {
+        if (isDraggingSlider) {
+            isDraggingSlider = false;
+            const id = control.id;
+            if (settings[id] !== tempSettings[id]) {
+                settings[id] = tempSettings[id];
+                updateControlIndicators();
+                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                    lastAppliedEffect = id;
+                }
+                if (img.complete && img.naturalWidth !== 0) {
+                    redrawImage(
+                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                    );
+                }
+            }
         }
-        const downloadPopup = document.querySelector('div[style*="position: fixed"][style*="z-index: 1002"]');
-        const downloadOverlay = document.querySelector('div[style*="position: fixed"][style*="z-index: 1001"]');
-        if (downloadPopup && downloadOverlay) {
-            document.body.removeChild(downloadPopup);
-            document.body.removeChild(downloadOverlay);
+    });
+    control.addEventListener('change', (e) => {
+        if (!isDraggingSlider) {
+            const id = e.target.id;
+            const newValue = parseInt(e.target.value);
+            if (settings[id] !== newValue) {
+                settings[id] = newValue;
+                updateControlIndicators();
+                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
+                    lastAppliedEffect = id;
+                }
+                if (img.complete && img.naturalWidth !== 0) {
+                    redrawImage(
+                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                    );
+                }
+            }
         }
-        if (isTriggering) {
-            cleanupFileInput();
-        }
-    } else if (e.ctrlKey && e.key === 'z') {
-        undoChange();
-    } else if (e.ctrlKey && e.key === 'y') {
-        redoChange();
-    }
+    });
 });
 
 canvas.addEventListener('click', (e) => {
@@ -818,12 +823,14 @@ canvas.addEventListener('click', (e) => {
             const controlsContainer = document.querySelector('.controls');
             const modalControls = document.getElementById('modal-controls');
             if (!controlsContainer || !modalControls) {
+                console.error("Controls container or modal controls not found");
                 return;
             }
             const clonedControls = controlsContainer.cloneNode(true);
             modalControls.innerHTML = '';
             modalControls.appendChild(clonedControls);
 
+            // Sync modal inputs with current settings
             const modalInputs = modalControls.querySelectorAll('input[type="range"]');
             modalInputs.forEach(input => {
                 input.value = settings[input.id];
@@ -835,7 +842,9 @@ canvas.addEventListener('click', (e) => {
                     redrawImage(
                         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
+                    ).catch(err => {
+                        console.error("Modal redraw failed:", err);
+                    });
                 }, 300));
             });
 
@@ -855,7 +864,14 @@ canvas.addEventListener('click', (e) => {
 canvas.addEventListener('touchend', (e) => {
     if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
         e.preventDefault();
+        // Optional: Add touch-specific behavior here if desired
     }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    isTriggering = false;
+    cleanupFileInput();
+    updateControlIndicators(); // Ensure indicators are set on load
 });
 
 document.addEventListener('keydown', (e) => {
@@ -875,8 +891,25 @@ document.addEventListener('keydown', (e) => {
             cleanupFileInput();
         }
     } else if (e.ctrlKey && e.key === 'z') {
-        undoChange();
+        debouncedUndo(e);
     } else if (e.ctrlKey && e.key === 'y') {
-        redoChange();
+        debouncedRedo(e);
     }
 });
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function initialize() {
+    updateControlIndicators();
+}
+initialize();
