@@ -1,6 +1,5 @@
 import { showLoadingIndicator } from './domUtils.js';
 import { saveImageState } from './history.js';
-import { applyBasicFiltersManually } from './filters.js'; // Adjust path as needed
 import { applyAdvancedFilters } from './advancedFilters.js';
 import { applyGlitchEffects } from './glitchEffects.js';
 import { applyComplexFilters } from './complexFilters.js';
