@@ -850,7 +850,7 @@ canvas.addEventListener('click', (e) => {
                     ).catch(err => {
                         console.error("Modal redraw failed:", err);
                     });
-                }, 300));
+                }, 500));
             });
 
             modalImage.src = canvas.toDataURL('image/png');

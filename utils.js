@@ -1,4 +1,3 @@
-// utils.js
 export function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -7,7 +6,7 @@ export function debounce(func, wait) {
             func(...args);
         };
         clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+        timeout = setTimeout(later, wait); // Line 5
     };
 }
 
