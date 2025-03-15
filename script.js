@@ -838,7 +838,12 @@ canvas.addEventListener('click', (e) => {
                     const id = e.target.id;
                     const newValue = parseInt(e.target.value);
                     settings[id] = newValue;
-                    updateControlIndicators();
+                    updateControlIndicators(); // Update text indicators
+                    // Sync main editor sliders
+                    const mainSlider = document.querySelector(`.controls input#${id}`);
+                    if (mainSlider) {
+                        mainSlider.value = newValue;
+                    }
                     redrawImage(
                         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
