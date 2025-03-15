@@ -1,8 +1,7 @@
 // script.js
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
-import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
-
+import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload, cropState, cropRect, rotation, resetCropState } from './cropHandler.js';
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const controls = document.querySelectorAll('.controls input');
@@ -200,8 +199,6 @@ if (window.Worker) {
                 }
             }
 
-            // Add other glitch effects as needed...
-
             ctx.putImageData(imageData, 0, 0);
         }
 
@@ -210,8 +207,6 @@ if (window.Worker) {
             const height = canvas.height;
             let imageData = ctx.getImageData(0, 0, width, height);
             let data = imageData.data;
-
-            // Add complex filters as needed...
 
             ctx.putImageData(imageData, 0, 0);
         }
@@ -247,12 +242,9 @@ if (window.Worker) {
                 console.log("toDataURL time:", performance.now() - start);
             }, 0);
         }
-        if (saveState && saveImageStateCallback) {
-            saveImageStateCallback();
-        }
+        saveImageState();
         showLoadingIndicator(false);
         console.log("Main-thread post-worker time:", performance.now() - start);
-        resolve();
     };
 }
 
@@ -269,9 +261,10 @@ function triggerFileUpload() {
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            trueOriginalImage.onload = () => { // Ensure it’s loaded
+            trueOriginalImage.onload = () => {
                 originalUploadedImage.src = event.target.result;
-                showCropModal(event.target.result);
+                resetCropState(trueOriginalImage.width, trueOriginalImage.height);
+                showCropModal(event.target.result); // Pass the data URL explicitly
             };
             cleanupFileInput();
         };
@@ -285,7 +278,6 @@ function triggerFileUpload() {
         }
     }, 1000);
 }
-
 function cleanupFileInput() {
     if (fileInput && document.body.contains(fileInput)) {
         document.body.removeChild(fileInput);
@@ -299,11 +291,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModal(cropModal, false);
     setupModal(previewModal, true);
     initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
-        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
+        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img,
+        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage,
+        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight,
         previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData,
-        redrawWorker // Add redrawWorker here
+        redrawWorker
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
@@ -336,7 +328,6 @@ function updateControlIndicators() {
     });
 }
 
-
 function handleToggleOriginal(e) {
     e.preventDefault();
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
@@ -347,27 +338,16 @@ function handleToggleOriginal(e) {
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
 
-    console.log(`Toggling to ${isShowingOriginal ? 'Original' : 'Edited'}`);
-    console.log("Current settings:", settings);
-    console.log("fullResCanvas dimensions:", fullResCanvas.width, fullResCanvas.height);
-    console.log("img src:", img.src ? "Valid" : "Empty");
-    console.log("trueOriginalImage src:", trueOriginalImage.src ? "Valid" : "Empty");
-
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
         isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
     ).then(() => {
-        console.log(`Toggled to ${isShowingOriginal ? 'Original' : 'Edited'} successfully`);
-        // Log pixel data to verify fullResCanvas content
-        const sampleData = fullResCtx.getImageData(0, 0, 1, 1).data;
-        console.log("Sample pixel from fullResCanvas:", sampleData);
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // Ensure clean slate
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (isShowingOriginal) {
             ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
         } else {
             ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         }
-        console.log("Canvas redrawn directly after redrawImage");
     }).catch(err => {
         console.error("Toggle redraw failed:", err);
         isShowingOriginal = !isShowingOriginal;
@@ -386,59 +366,36 @@ img.onload = function () {
 
     const maxDisplayWidth = Math.min(1920, window.innerWidth - 20);
     const maxDisplayHeight = window.innerHeight - (window.innerWidth <= 768 ? 0.4 * window.innerHeight + 20 : 250);
-    const minPreviewDimension = 400;
     const ratio = originalWidth / originalHeight;
 
-    if (window.innerWidth <= 768) {
-        previewHeight = Math.min(originalHeight, maxDisplayHeight);
-        previewWidth = previewHeight * ratio;
-        if (previewWidth > maxDisplayWidth) {
-            previewWidth = maxDisplayWidth;
-            previewHeight = previewWidth / ratio;
-        }
-    } else {
-        if (ratio > 1) {
-            previewWidth = Math.min(originalWidth, maxDisplayWidth);
-            previewHeight = previewWidth / ratio;
-            if (previewHeight > maxDisplayHeight) {
-                previewHeight = maxDisplayHeight;
-                previewWidth = previewHeight * ratio;
-            }
-            if (previewHeight < minPreviewDimension) {
-                previewHeight = minPreviewDimension;
-                previewWidth = previewHeight * ratio;
-            }
-        } else {
-            previewHeight = Math.min(originalHeight, maxDisplayHeight);
-            previewWidth = previewHeight * ratio;
-            if (previewWidth > maxDisplayWidth) {
-                previewWidth = maxDisplayWidth;
-                previewHeight = previewWidth / ratio;
-            }
-            if (previewWidth < minPreviewDimension) {
-                previewWidth = minPreviewDimension;
-                previewHeight = previewWidth / ratio;
-            }
-        }
+    let targetWidth = originalWidth;
+    let targetHeight = originalHeight;
+    const maxCanvasSize = 1920;
+    if (targetWidth > maxCanvasSize || targetHeight > maxCanvasSize) {
+        const scale = Math.min(maxCanvasSize / targetWidth, maxCanvasSize / targetHeight);
+        targetWidth = Math.round(targetWidth * scale);
+        targetHeight = Math.round(targetHeight * scale);
     }
 
-    canvas.width = Math.round(previewWidth);
-    canvas.height = Math.round(previewHeight);
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
-    if (!originalUploadedImage.src || originalUploadedImage.src === "") {
-        originalUploadedImage.src = img.src;
-    }
+    canvas.style.maxWidth = `${maxDisplayWidth}px`;
+    canvas.style.maxHeight = `${maxDisplayHeight}px`;
+    canvas.style.width = 'auto';
+    canvas.style.height = 'auto';
+    canvas.style.objectFit = 'contain';
 
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
     ).then(() => {
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = previewWidth;
-        tempCanvas.height = previewHeight;
+        tempCanvas.width = targetWidth;
+        tempCanvas.height = targetHeight;
         const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, 0, 0, previewWidth, previewHeight);
-        originalImageData = tempCtx.getImageData(0, 0, previewWidth, previewHeight);
+        tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        originalImageData = tempCtx.getImageData(0, 0, targetWidth, targetHeight);
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         uploadNewPhotoButton.style.display = 'block';
         canvas.style.display = 'block';
@@ -447,7 +404,6 @@ img.onload = function () {
         canvas.style.display = 'block';
     });
 };
-
 
 downloadButton.addEventListener('click', () => {
     const popup = document.createElement('div');
@@ -620,7 +576,6 @@ function handleUndo(e) {
             return;
         }
 
-        console.log("handleUndo - Applying previous settings:", settings);
         redrawImage(
             ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
@@ -629,8 +584,6 @@ function handleUndo(e) {
         }).catch(err => {
             console.error("Undo redraw failed:", err);
         });
-    } else {
-        console.log("handleUndo: No previous state to undo");
     }
 }
 
@@ -644,15 +597,14 @@ function handleRedo(e) {
             input.value = settings[input.id];
         });
         updateControlIndicators();
-        
-        const activeImage = (cropModal.style.display === 'block' && cropImage.complete && cropImage.naturalWidth !== 0) ? cropImage : img;
-        if (!activeImage || !activeImage.complete || activeImage.naturalWidth === 0) {
-            console.error("handleRedo: No valid image available", activeImage);
+
+        if (!img || !img.complete || img.naturalWidth === 0) {
+            console.error("handleRedo: No valid image available", img);
             return;
         }
-        
+
         redrawImage(
-            ctx, canvas, fullResCanvas, fullResCtx, activeImage, settings, noiseSeed,
+            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
         ).catch(err => {
             console.error("Redo failed:", err);
@@ -684,20 +636,20 @@ addButtonListeners(redoButton, debouncedRedo);
 
 cropImageButton.addEventListener('click', (e) => {
     e.preventDefault();
-    if (!img.src || img.src === "") {
-        console.error("No image source available to crop");
+    if (!cropState.trueOriginalImage.src || cropState.trueOriginalImage.src === "") {
+        console.error("No original image source available to crop");
         return;
     }
-    showCropModal(img.src); // Pass img.src
+    showCropModal(cropState.trueOriginalImage.src).catch(err => console.error("Crop modal failed:", err));
 });
 
 cropImageButton.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (!img.src || img.src === "") {
-        console.error("No image source available to crop");
+    if (!cropState.trueOriginalImage.src || cropState.trueOriginalImage.src === "") {
+        console.error("No original image source available to crop");
         return;
     }
-    showCropModal(img.src); // Pass img.src
+    showCropModal(cropState.trueOriginalImage.src).catch(err => console.error("Crop modal failed:", err));
 });
 
 restoreButton.addEventListener('click', () => {
@@ -740,8 +692,6 @@ restoreButton.addEventListener('click', () => {
         });
     }
 });
-
-
 
 let isDraggingSlider = false;
 let tempSettings = {};
@@ -786,7 +736,7 @@ controls.forEach(control => {
                         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
                     ).then(() => {
-                        originalFullResImage.src = fullResCanvas.toDataURL('image/png'); // Persist edited state
+                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
                     });
                 }
             }
@@ -807,7 +757,7 @@ controls.forEach(control => {
                         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
                     ).then(() => {
-                        originalFullResImage.src = fullResCanvas.toDataURL('image/png'); // Persist edited state
+                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
                     });
                 }
             }
@@ -848,7 +798,6 @@ canvas.addEventListener('click', (e) => {
             modalControls.innerHTML = '';
             modalControls.appendChild(clonedControls);
 
-            // Sync modal inputs with current settings
             const modalInputs = modalControls.querySelectorAll('input[type="range"]');
             modalInputs.forEach(input => {
                 input.value = settings[input.id];
@@ -886,14 +835,13 @@ canvas.addEventListener('click', (e) => {
 canvas.addEventListener('touchend', (e) => {
     if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
         e.preventDefault();
-        // Optional: Add touch-specific behavior here if desired
     }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
     isTriggering = false;
     cleanupFileInput();
-    updateControlIndicators(); // Ensure indicators are set on load
+    updateControlIndicators();
 });
 
 document.addEventListener('keydown', (e) => {
