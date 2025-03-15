@@ -335,7 +335,6 @@ toggleOriginalButton.addEventListener('click', () => {
     });
 });
 
-// Touchend listener
 toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
@@ -352,18 +351,6 @@ toggleOriginalButton.addEventListener('touchend', (e) => {
         isShowingOriginal = !isShowingOriginal;
         toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
-});
-
-// Update touchend listener similarly
-toggleOriginalButton.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
-        console.error("Cannot toggle: Original image not loaded");
-        return;
-    }
-    isShowingOriginal = !isShowingOriginal;
-    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    ctx.drawImage(isShowingOriginal ? trueOriginalImage : fullResCanvas, 0, 0, canvas.width, canvas.height); // Direct draw instead of redrawImage
 });
 
 img.onload = function () {
@@ -726,6 +713,7 @@ restoreButton.addEventListener('click', () => {
         });
     }
 });
+
 
 
 
