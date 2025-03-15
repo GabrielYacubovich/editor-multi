@@ -231,10 +231,28 @@ if (window.Worker) {
     `], { type: 'application/javascript' })));
 
     redrawWorker.onmessage = (e) => {
-        ctx.putImageData(e.data.imageData, 0, 0);
-        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-        canvas.style.display = 'block';
+        const start = performance.now();
+        fullResCtx.putImageData(e.data.imageData, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        if (isShowingOriginal && trueOriginalImage.complete) {
+            ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
+        } else {
+            ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+        }
+        if (modal?.style.display === 'block') {
+            setTimeout(() => {
+                modalImage.src = canvas.toDataURL('image/png');
+                console.log("toDataURL time:", performance.now() - start);
+            }, 0);
+        }
+        if (saveState && saveImageStateCallback) {
+            saveImageStateCallback();
+        }
         showLoadingIndicator(false);
+        console.log("Main-thread post-worker time:", performance.now() - start);
+        resolve();
     };
 }
 
@@ -838,8 +856,7 @@ canvas.addEventListener('click', (e) => {
                     const id = e.target.id;
                     const newValue = parseInt(e.target.value);
                     settings[id] = newValue;
-                    updateControlIndicators(); // Update text indicators
-                    // Sync main editor sliders
+                    updateControlIndicators();
                     const mainSlider = document.querySelector(`.controls input#${id}`);
                     if (mainSlider) {
                         mainSlider.value = newValue;

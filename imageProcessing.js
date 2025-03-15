@@ -372,7 +372,7 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
     fullResCanvas.height = img.height;
     fullResCtx.drawImage(img, 0, 0);
 
-    if (window.Worker && redrawWorker && redrawWorker instanceof Worker) { // Simplified condition
+    if (window.Worker && redrawWorker && redrawWorker instanceof Worker) {
         console.log("Using Web Worker for redraw");
         const imageData = fullResCtx.getImageData(0, 0, img.width, img.height);
         return new Promise((resolve, reject) => {
@@ -386,8 +386,11 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
                 } else {
                     ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
                 }
+                // Only update modalImage if modal is visible, and debounce it
                 if (modal?.style.display === 'block') {
-                    modalImage.src = canvas.toDataURL('image/png');
+                    setTimeout(() => {
+                        modalImage.src = canvas.toDataURL('image/png');
+                    }, 0); // Offload to next tick
                 }
                 if (saveState && saveImageStateCallback) {
                     saveImageStateCallback();
