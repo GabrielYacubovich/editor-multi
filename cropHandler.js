@@ -196,6 +196,10 @@ function setupCropControls(unfilteredCanvas) {
                 drawCropOverlay();
             });
     });
+    closeModal(cropModal);
+cropModal.style.visibility = 'hidden';
+cropModal.style.transition = 'none'; // Disable transitions
+console.log("Modal closed, display:", cropModal.style.display);
     confirmBtn.addEventListener('click', (e) => {
         e.preventDefault();
         console.log("Confirm clicked, cropImage state:", cropImage.complete, cropImage.naturalWidth);
