@@ -277,7 +277,10 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    setupModal(modal, false);
+    cropModal.style.display = 'none';
+    modal.style.display = 'none';
+    previewModal.style.display = 'none';
+     setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
     initializeCropHandler({
@@ -289,6 +292,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
+    isTriggering = false;
+    cleanupFileInput();
+    cropRect = { x: 0, y: 0, width: 0, height: 0 };
+    rotation = 0;
 });
 
 uploadNewPhotoButton.addEventListener('click', (e) => {

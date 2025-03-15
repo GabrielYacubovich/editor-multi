@@ -196,10 +196,7 @@ function setupCropControls(unfilteredCanvas) {
                 drawCropOverlay();
             });
     });
-    closeModal(cropModal);
-cropModal.style.visibility = 'hidden';
-cropModal.style.transition = 'none'; // Disable transitions
-console.log("Modal closed, display:", cropModal.style.display);
+
     confirmBtn.addEventListener('click', (e) => {
         e.preventDefault();
         console.log("Confirm clicked, cropImage state:", cropImage.complete, cropImage.naturalWidth);
@@ -208,15 +205,12 @@ console.log("Modal closed, display:", cropModal.style.display);
             return;
         }
     
-        // Close modal and force immediate hide
+        // Close modal immediately
         closeModal(cropModal);
-        cropModal.style.visibility = 'hidden'; // Extra measure to hide
         console.log("Modal closed, display:", cropModal.style.display);
-    
-        // Show loading indicator
         showLoadingIndicator(true);
     
-        // Use setTimeout to yield control and ensure repaint
+        // Yield to ensure modal closure renders
         setTimeout(() => {
             try {
                 const origWidth = cropImage.width;
