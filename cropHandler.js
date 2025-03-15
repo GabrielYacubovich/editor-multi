@@ -3,7 +3,6 @@ import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { clamp, debounce } from './utils.js';
 import { img, fullResCanvas, fullResCtx, canvas, ctx, originalWidth, originalHeight, trueOriginalImage, originalUploadedImage, previewWidth, previewHeight, originalImageData, initialCropRect, initialRotation } from './globals.js';
-import { redrawWorker } from './script.js'; // Import redrawWorker
 import { redrawImage } from './imageProcessing.js';
 
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
