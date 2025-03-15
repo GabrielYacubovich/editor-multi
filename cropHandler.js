@@ -7,8 +7,6 @@ import { img, fullResCanvas, fullResCtx, canvas, ctx, originalWidth, originalHei
 let cropModal, cropCanvas, cropCtx, originalFullResImage, modal, modalImage, 
     uploadNewPhotoButton, saveImageState;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
-let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
-let initialRotation = 0;
 let originalCropRect = { x: 0, y: 0, width: 0, height: 0 };
 let originalRotation = 0;
 let rotation = 0;

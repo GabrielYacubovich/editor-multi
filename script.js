@@ -917,9 +917,12 @@ function initialize() {
 }
 initialize();
 
-export let canvas = null; // Initialize as null
+// script.js (updated export section at the bottom)
+export let canvas = null;
 export let ctx = null;
 export let img = new Image();
 export let fullResCanvas = document.createElement('canvas');
 export let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
 export let originalWidth, originalHeight, settings, noiseSeed, trueOriginalImage = new Image(), isShowingOriginal;
+export let initialCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Add this
+export let initialRotation = 0; // Add this
