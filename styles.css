@@ -64,7 +64,9 @@ body {
     width: 30%;
     min-width: 250px;
 }
-
+#crop-modal {
+    transition: none !important;
+}
 #sliders-wrapper {
     width: 100%;
     -webkit-overflow-scrolling: touch;

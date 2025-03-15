@@ -205,14 +205,16 @@ function setupCropControls(unfilteredCanvas) {
             return;
         }
     
+        // Close modal and force UI update
         closeModal(cropModal);
         console.log("Modal closed, display:", cropModal.style.display);
     
-        // Force UI update before heavy processing
-        setTimeout(() => {
+        // Use requestAnimationFrame to ensure repaint
+        requestAnimationFrame(() => {
             showLoadingIndicator(true);
     
-            try {
+            // Wrap cropping in a Promise to offload work
+            new Promise((resolve) => {
                 const origWidth = cropImage.width;
                 const origHeight = cropImage.height;
                 const angleRad = rotation * Math.PI / 180;
@@ -250,17 +252,20 @@ function setupCropControls(unfilteredCanvas) {
                     0, 0, cropWidth, cropHeight
                 );
     
+                resolve(tempCanvas);
+            })
+            .then((tempCanvas) => {
                 img.src = tempCanvas.toDataURL('image/png');
                 originalUploadedImage.src = img.src;
                 trueOriginalImage.src = img.src;
     
-                fullResCanvas.width = cropWidth;
-                fullResCanvas.height = cropHeight;
+                fullResCanvas.width = tempCanvas.width;
+                fullResCanvas.height = tempCanvas.height;
                 fullResCtx.drawImage(tempCanvas, 0, 0);
     
                 if (redrawWorker) {
-                    const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
-                    redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
+                    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                    redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: tempCanvas.width, height: tempCanvas.height });
                     redrawWorker.onmessage = (e) => {
                         fullResCtx.putImageData(e.data.imageData, 0, 0);
                         ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
@@ -268,25 +273,29 @@ function setupCropControls(unfilteredCanvas) {
                         showLoadingIndicator(false);
                     };
                 } else {
-                    redrawImage(
+                    return redrawImage(
                         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
                     ).then(() => {
                         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                        showLoadingIndicator(false);
-                    }).catch(err => {
-                        console.error("Redraw failed in fallback:", err);
-                        showLoadingIndicator(false);
                     });
                 }
-    
-                initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
+            })
+            .then(() => {
+                initialCropRect = {
+                    x: cropRect.x / (parseFloat(cropCanvas.dataset.scaleFactor) || 1),
+                    y: cropRect.y / (parseFloat(cropCanvas.dataset.scaleFactor) || 1),
+                    width: Math.round(cropRect.width / (parseFloat(cropCanvas.dataset.scaleFactor) || 1)),
+                    height: Math.round(cropRect.height / (parseFloat(cropCanvas.dataset.scaleFactor) || 1))
+                };
                 initialRotation = rotation;
-            } catch (error) {
+                showLoadingIndicator(false);
+            })
+            .catch((error) => {
                 console.error("Cropping failed:", error);
                 showLoadingIndicator(false);
-            }
-        }, 0); // Yield to event loop for UI update
+            });
+        });
     });
     
     const debouncedConfirmClick = debounce(() => {
