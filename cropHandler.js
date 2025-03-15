@@ -303,6 +303,11 @@ function setupCropControls(unfilteredCanvas) {
 }
 
 function drawCropOverlay() {
+    if (!cropImage || !cropImage.complete || cropImage.naturalWidth === 0) {
+        console.error("Cannot draw crop overlay: cropImage not loaded");
+        return;
+    }
+
     const originalWidth = cropImage.width;
     const originalHeight = cropImage.height;
     const angleRad = rotation * Math.PI / 180;
