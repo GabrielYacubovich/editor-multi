@@ -373,7 +373,6 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
     fullResCanvas.height = img.height;
     fullResCtx.drawImage(img, 0, 0);
 
-    await new Promise(resolve => setTimeout(resolve, 0)); // Yield to main thread
     applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
     await applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
     await applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
