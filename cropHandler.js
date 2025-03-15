@@ -131,8 +131,8 @@ function setupCropControls() {
         rotationInput.value = 0;
         rotationValue.textContent = '0°';
 
-        const maxCanvasWidth = window.innerWidth - 1;
-        const maxCanvasHeight = window.innerHeight - 1;
+        const maxCanvasWidth = window.innerWidth - 100;
+        const maxCanvasHeight = window.innerHeight - 250;
         let width = trueOriginalImage.width;
         let height = trueOriginalImage.height;
         const ratio = width / height;
@@ -245,8 +245,8 @@ function setupCropControls() {
             fullResCanvas.height = originalHeight;
             fullResCtx.drawImage(tempCanvas, 0, 0);
     
-            const maxDisplayWidth = Math.min(1920, window.innerWidth - 1);
-            const maxDisplayHeight = Math.min(1080, window.innerHeight - 1);
+            const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
+            const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
             const minPreviewDimension = 800;
             const ratio = originalWidth / originalHeight;
     
