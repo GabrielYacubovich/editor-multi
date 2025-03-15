@@ -199,19 +199,18 @@ function setupCropControls(unfilteredCanvas) {
     confirmBtn.addEventListener('click', (e) => {
         e.preventDefault();
         console.log("Confirm clicked, cropImage state:", cropImage.complete, cropImage.naturalWidth);
-    
         if (!cropImage.complete || cropImage.naturalWidth === 0) {
             console.error("Confirm failed: cropImage not loaded", cropImage);
             return;
         }
     
-        closeModal(cropModal);
+        closeModal(cropModal); // Close modal first
         console.log("Modal closed, display:", cropModal.style.display);
+        showLoadingIndicator(true); // Show loading immediately after
     
+        // Yield to browser to ensure modal closure renders
         requestAnimationFrame(() => {
-            showLoadingIndicator(true);
-    
-            new Promise((resolve) => {
+            try {
                 const origWidth = cropImage.width;
                 const origHeight = cropImage.height;
                 const angleRad = rotation * Math.PI / 180;
@@ -249,50 +248,87 @@ function setupCropControls(unfilteredCanvas) {
                     0, 0, cropWidth, cropHeight
                 );
     
-                resolve(tempCanvas); // Pass only tempCanvas
-            })
-            .then((tempCanvas) => {
                 img.src = tempCanvas.toDataURL('image/png');
                 originalUploadedImage.src = img.src;
                 trueOriginalImage.src = img.src;
     
-                fullResCanvas.width = tempCanvas.width;
-                fullResCanvas.height = tempCanvas.height;
+                fullResCanvas.width = cropWidth;
+                fullResCanvas.height = cropHeight;
                 fullResCtx.drawImage(tempCanvas, 0, 0);
     
-                if (redrawWorker) {
-                    const tempCtx = tempCanvas.getContext('2d'); // Re-get context here
-                    const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-                    redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: tempCanvas.width, height: tempCanvas.height });
-                    redrawWorker.onmessage = (e) => {
-                        fullResCtx.putImageData(e.data.imageData, 0, 0);
-                        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                        showLoadingIndicator(false);
-                    };
-                } else {
-                    return redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    ).then(() => {
-                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                    });
-                }
-            })
-            .then(() => {
-                initialCropRect = {
-                    x: cropRect.x / (parseFloat(cropCanvas.dataset.scaleFactor) || 1),
-                    y: cropRect.y / (parseFloat(cropCanvas.dataset.scaleFactor) || 1),
-                    width: Math.round(cropRect.width / (parseFloat(cropCanvas.dataset.scaleFactor) || 1)),
-                    height: Math.round(cropRect.height / (parseFloat(cropCanvas.dataset.scaleFactor) || 1))
-                };
-                initialRotation = rotation;
-                showLoadingIndicator(false);
-            })
-            .catch((error) => {
+                const loadImage = new Promise((resolve) => {
+                    if (img.complete && img.naturalWidth !== 0) resolve();
+                    else {
+                        img.onload = resolve;
+                        img.onerror = () => resolve();
+                    }
+                });
+    
+                loadImage.then(() => {
+                    // Preview size calculation (from original)
+                    const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
+                    const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
+                    const minPreviewDimension = 800;
+                    const ratio = cropWidth / cropHeight;
+                    let previewWidth, previewHeight;
+                    if (ratio > 1) {
+                        previewWidth = Math.min(cropWidth, maxDisplayWidth);
+                        previewHeight = previewWidth / ratio;
+                        if (previewHeight > maxDisplayHeight) {
+                            previewHeight = maxDisplayHeight;
+                            previewWidth = previewHeight * ratio;
+                        }
+                        if (previewHeight < minPreviewDimension) {
+                            previewHeight = minPreviewDimension;
+                            previewWidth = previewHeight * ratio;
+                        }
+                    } else {
+                        previewHeight = Math.min(cropHeight, maxDisplayHeight);
+                        previewWidth = previewHeight * ratio;
+                        if (previewWidth > maxDisplayWidth) {
+                            previewWidth = maxDisplayWidth;
+                            previewHeight = previewWidth / ratio;
+                        }
+                        if (previewWidth < minPreviewDimension) {
+                            previewWidth = minPreviewDimension;
+                            previewHeight = previewWidth / ratio;
+                        }
+                    }
+                    canvas.width = Math.round(previewWidth);
+                    canvas.height = Math.round(previewHeight);
+    
+                    if (redrawWorker) {
+                        const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
+                        redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
+                        redrawWorker.onmessage = (e) => {
+                            fullResCtx.putImageData(e.data.imageData, 0, 0);
+                            ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+                            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                            initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
+                            initialRotation = rotation;
+                            showLoadingIndicator(false);
+                            uploadNewPhotoButton.style.display = 'block';
+                        };
+                    } else {
+                        redrawImage(
+                            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                            isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                        ).then(() => {
+                            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                            initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
+                            initialRotation = rotation;
+                            showLoadingIndicator(false);
+                            uploadNewPhotoButton.style.display = 'block';
+                        }).catch(err => {
+                            console.error("Redraw failed:", err);
+                            showLoadingIndicator(false);
+                        });
+                    }
+                });
+            } catch (error) {
                 console.error("Cropping failed:", error);
                 showLoadingIndicator(false);
-            });
+            }
         });
     });
     
