@@ -182,78 +182,82 @@ function setupCropControls() {
             console.error("Confirm failed: cropImage not loaded", cropImage);
             return;
         }
-        closeModal(cropModal);
+        console.log("Confirm clicked, closing modal"); // Debug
+        cropModal.style.display = 'none'; // Immediate close
         showLoadingIndicator(true);
     
-        const origWidth = cropImage.width;
-        const origHeight = cropImage.height;
-        const angleRad = rotation * Math.PI / 180;
-        const cosA = Math.abs(Math.cos(angleRad));
-        const sinA = Math.abs(Math.sin(angleRad));
-        const fullRotatedWidth = Math.ceil(origWidth * cosA + origHeight * sinA);
-        const fullRotatedHeight = Math.ceil(origWidth * sinA + origHeight * cosA);
-        const fullRotatedCanvas = document.createElement('canvas');
-        fullRotatedCanvas.width = fullRotatedWidth;
-        fullRotatedCanvas.height = fullRotatedHeight;
-        const fullRotatedCtx = fullRotatedCanvas.getContext('2d');
-        fullRotatedCtx.imageSmoothingEnabled = true;
-        fullRotatedCtx.imageSmoothingQuality = 'high';
-        fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
-        fullRotatedCtx.rotate(angleRad);
-        fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
-        fullRotatedCtx.drawImage(trueOriginalImage, 0, 0, origWidth, origHeight);
+        try {
+            const origWidth = cropImage.width;
+            const origHeight = cropImage.height;
+            const angleRad = rotation * Math.PI / 180;
+            const cosA = Math.abs(Math.cos(angleRad));
+            const sinA = Math.abs(Math.sin(angleRad));
+            const fullRotatedWidth = Math.ceil(origWidth * cosA + origHeight * sinA);
+            const fullRotatedHeight = Math.ceil(origWidth * sinA + origHeight * cosA);
+            const fullRotatedCanvas = document.createElement('canvas');
+            fullRotatedCanvas.width = fullRotatedWidth;
+            fullRotatedCanvas.height = fullRotatedHeight;
+            const fullRotatedCtx = fullRotatedCanvas.getContext('2d');
+            fullRotatedCtx.imageSmoothingEnabled = true;
+            fullRotatedCtx.imageSmoothingQuality = 'high';
+            fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
+            fullRotatedCtx.rotate(angleRad);
+            fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
+            fullRotatedCtx.drawImage(trueOriginalImage, 0, 0, origWidth, origHeight);
     
-        const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
-        const cropX = cropRect.x / scaleFactor;
-        const cropY = cropRect.y / scaleFactor;
-        const cropWidth = Math.round(cropRect.width / scaleFactor);
-        const cropHeight = Math.round(cropRect.height / scaleFactor);
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = cropWidth;
-        tempCanvas.height = cropHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.imageSmoothingEnabled = true;
-        tempCtx.imageSmoothingQuality = 'high';
-        tempCtx.drawImage(
-            fullRotatedCanvas,
-            cropX, cropY, cropWidth, cropHeight,
-            0, 0, cropWidth, cropHeight
-        );
+            const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
+            const cropX = cropRect.x / scaleFactor;
+            const cropY = cropRect.y / scaleFactor;
+            const cropWidth = Math.round(cropRect.width / scaleFactor);
+            const cropHeight = Math.round(cropRect.height / scaleFactor);
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = cropWidth;
+            tempCanvas.height = cropHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(
+                fullRotatedCanvas,
+                cropX, cropY, cropWidth, cropHeight,
+                0, 0, cropWidth, cropHeight
+            );
     
-        // Update img and originals
-        img.src = tempCanvas.toDataURL('image/png');
-        originalUploadedImage.src = img.src;
-        trueOriginalImage.src = img.src;
+            img.src = tempCanvas.toDataURL('image/png');
+            originalUploadedImage.src = img.src;
+            trueOriginalImage.src = img.src;
     
-        // Update fullResCanvas dimensions and redraw with filters
-        fullResCanvas.width = cropWidth;
-        fullResCanvas.height = cropHeight;
-        fullResCtx.drawImage(tempCanvas, 0, 0);
+            fullResCanvas.width = cropWidth;
+            fullResCanvas.height = cropHeight;
+            fullResCtx.drawImage(tempCanvas, 0, 0);
     
-        if (redrawWorker) {
-            const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
-            redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
-            redrawWorker.onmessage = (e) => {
-                fullResCtx.putImageData(e.data.imageData, 0, 0);
+            const finalizeCrop = () => {
+                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
                 ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
                 showLoadingIndicator(false);
+                initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
+                initialRotation = rotation;
             };
-        } else {
-            redrawImage(
-                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-            ).then(() => {
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                showLoadingIndicator(false);
-            }).catch(err => {
-                console.error("Redraw failed in fallback:", err);
-                showLoadingIndicator(false);
-            });
-        }
     
-        initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
-        initialRotation = rotation;
+            if (redrawWorker) {
+                const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
+                redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
+                redrawWorker.onmessage = (e) => {
+                    fullResCtx.putImageData(e.data.imageData, 0, 0);
+                    finalizeCrop();
+                };
+            } else {
+                redrawImage(
+                    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                    isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
+                ).then(finalizeCrop).catch(err => {
+                    console.error("Redraw failed in fallback:", err);
+                    showLoadingIndicator(false);
+                });
+            }
+        } catch (error) {
+            console.error("Crop confirmation error:", error);
+            showLoadingIndicator(false);
+        }
     });
     
     const debouncedConfirmClick = debounce(() => {
