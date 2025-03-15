@@ -27,6 +27,7 @@ let isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
 let trueOriginalImage = new Image();
+
 let modal = null;
 let modalImage = null;
 let settings = {
@@ -55,7 +56,8 @@ let history = [{ filters: { ...settings }, imageData: null }];
 let redoHistory = [];
 let lastAppliedEffect = null;
 let originalWidth, originalHeight, previewWidth, previewHeight;
-
+let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
+let initialRotation = 0;
 let isTriggering = false;
 let fileInput = null;
 
@@ -904,5 +906,6 @@ export {
     modal,
     modalImage,
     initialCropRect,
-    originalImageData
+    originalImageData,
+    initialRotation
 };
