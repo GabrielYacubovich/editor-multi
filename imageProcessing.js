@@ -1,7 +1,7 @@
 
 // imageProcessing.js
 import { showLoadingIndicator } from './domUtils.js';
-import { img, fullResCanvas, fullResCtx, canvas, ctx, originalWidth, originalHeight, settings, noiseSeed, trueOriginalImage, isShowingOriginal, modal, modalImage } from './script.js';
+
 // Basic Filters
 function applyBasicFiltersManually(ctx, canvas, settings) {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -361,52 +361,50 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 
 // Redraw Image
 // In imageProcessing.js
-function redrawImage(saveState = false) {
-    console.log("redrawImage called with img:", img.src);
-    showLoadingIndicator(true);
-    fullResCanvas.width = originalWidth;
-    fullResCanvas.height = originalHeight;
-    if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
-        console.error("Invalid fullResCanvas dimensions:", fullResCanvas.width, fullResCanvas.height);
+async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, saveState, saveImageStateCallback) {
+    if (!img.complete || img.naturalWidth === 0) {
+        console.error("redrawImage: img not loaded", img);
         showLoadingIndicator(false);
-        return Promise.reject("Invalid canvas dimensions");
+        return;
     }
-    fullResCtx.clearRect(0, 0, fullResCanvas.width, fullResCanvas.height);
-    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
-    applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
-    const scaleFactor = 1;
-    return applyAdvancedFilters(fullResCtx, fullResCanvas, noiseSeed, scaleFactor)
-        .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, noiseSeed, scaleFactor))
-        .then(() => applyComplexFilters(fullResCtx, fullResCanvas, noiseSeed, scaleFactor))
-        .then(() => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (isShowingOriginal && trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-            } else {
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-            }
-            if (modal.style.display === 'block') {
-                modalImage.src = canvas.toDataURL('image/png');
-            }
-            if (saveState) saveImageState();
-            showLoadingIndicator(false);
-            console.log("redrawImage completed");
-        }).catch(err => {
-            console.error("redrawImage error:", err);
-            showLoadingIndicator(false);
-            throw err;
-        });
-}
+    showLoadingIndicator(true);
+    fullResCanvas.width = img.width;
+    fullResCanvas.height = img.height;
+    fullResCtx.drawImage(img, 0, 0);
 
+    await new Promise(resolve => setTimeout(resolve, 0)); // Yield to main thread
+    applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
+    await applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
+    await applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
+    await applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (isShowingOriginal && trueOriginalImage.complete) {
+        ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+    }
+
+    if (modal?.style.display === 'block') {
+        modalImage.src = canvas.toDataURL('image/png');
+    }
+    if (saveState && saveImageStateCallback) {
+        saveImageStateCallback();
+    }
+    showLoadingIndicator(false);
+}
+// Utility function
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+}
 
 export { 
     applyBasicFiltersManually, 
     applyAdvancedFilters, 
     applyGlitchEffects, 
     applyComplexFilters, 
-    redrawImage 
+    redrawImage, 
+    clamp 
 };

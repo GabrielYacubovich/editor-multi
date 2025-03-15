@@ -2,10 +2,9 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
-import { cropImage } from './cropHandler.js';
-// Declare variables in module scope
-let canvas = document.getElementById('canvas');
-let ctx = canvas ? canvas.getContext('2d', { willReadFrequently: true }) : null;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const controls = document.querySelectorAll('.controls input');
 const undoButton = document.getElementById('undo');
 const redoButton = document.getElementById('redo');
@@ -14,10 +13,12 @@ const downloadButton = document.getElementById('download');
 const cropImageButton = document.getElementById('crop-image-button');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
 const toggleOriginalButton = document.getElementById('toggle-original');
-let cropModal = document.getElementById('crop-modal');
-let cropCanvas = document.getElementById('crop-canvas');
-let cropCtx = cropCanvas ? cropCanvas.getContext('2d') : null;
-let previewModal = document.getElementById('preview-modal');
+const modal = document.getElementById('image-modal');
+const modalImage = document.getElementById('modal-image');
+const cropModal = document.getElementById('crop-modal');
+const cropCanvas = document.getElementById('crop-canvas');
+const cropCtx = cropCanvas.getContext('2d');
+const previewModal = document.getElementById('preview-modal');
 let img = new Image();
 let originalImageData = null;
 let noiseSeed = Math.random();
@@ -27,9 +28,6 @@ let isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
 let trueOriginalImage = new Image();
-
-let modal = null;
-let modalImage = null;
 let settings = {
     brightness: 100,
     contrast: 100,
@@ -56,17 +54,18 @@ let history = [{ filters: { ...settings }, imageData: null }];
 let redoHistory = [];
 let lastAppliedEffect = null;
 let originalWidth, originalHeight, previewWidth, previewHeight;
-let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
-let initialRotation = 0;
+
 let isTriggering = false;
 let fileInput = null;
 
-let redrawWorker;
+export let redrawWorker;
 if (window.Worker) {
     redrawWorker = new Worker(URL.createObjectURL(new Blob([`
+        // Inline functions from imageProcessing.js
         function clamp(value, min, max) {
             return Math.min(Math.max(value, min), max);
         }
+
         function applyBasicFiltersManually(ctx, canvas, settings) {
             let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
@@ -124,6 +123,7 @@ if (window.Worker) {
             }
             ctx.putImageData(imageData, 0, 0);
         }
+
         async function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
             let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
@@ -161,8 +161,10 @@ if (window.Worker) {
                 data[i + 1] = clamp(g, 0, 255);
                 data[i + 2] = clamp(b, 0, 255);
             }
+
             ctx.putImageData(imageData, 0, 0);
         }
+
         async function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
             const width = canvas.width;
             const height = canvas.height;
@@ -197,15 +199,23 @@ if (window.Worker) {
                     }
                 }
             }
+
+            // Add other glitch effects as needed...
+
             ctx.putImageData(imageData, 0, 0);
         }
+
         async function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
             const width = canvas.width;
             const height = canvas.height;
             let imageData = ctx.getImageData(0, 0, width, height);
             let data = imageData.data;
+
+            // Add complex filters as needed...
+
             ctx.putImageData(imageData, 0, 0);
         }
+
         self.onmessage = async (e) => {
             const { imgData, settings, noiseSeed, width, height } = e.data;
             const offscreenCanvas = new OffscreenCanvas(width, height);
@@ -221,12 +231,10 @@ if (window.Worker) {
     `], { type: 'application/javascript' })));
 
     redrawWorker.onmessage = (e) => {
-        if (ctx) {
-            ctx.putImageData(e.data.imageData, 0, 0);
-            originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-            canvas.style.display = 'block';
-            showLoadingIndicator(false);
-        }
+        ctx.putImageData(e.data.imageData, 0, 0);
+        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+        canvas.style.display = 'block';
+        showLoadingIndicator(false);
     };
 }
 
@@ -243,7 +251,7 @@ function triggerFileUpload() {
         const reader = new FileReader();
         reader.onload = (event) => {
             trueOriginalImage.src = event.target.result;
-            trueOriginalImage.onload = () => {
+            trueOriginalImage.onload = () => { // Ensure it’s loaded
                 originalUploadedImage.src = event.target.result;
                 showCropModal(event.target.result);
             };
@@ -269,23 +277,15 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    canvas = document.getElementById('canvas');
-    ctx = canvas ? canvas.getContext('2d', { willReadFrequently: true }) : null;
-    modal = document.getElementById('image-modal'); // Fix Error 1
-    cropModal = document.getElementById('crop-modal');
-    previewModal = document.getElementById('preview-modal');
-    cropCanvas = document.getElementById('crop-canvas'); // Ensure consistency
-    cropCtx = cropCanvas ? cropCanvas.getContext('2d') : null;
-    if (!cropCanvas) console.error("cropCanvas not found in DOM"); // Debug
-
     setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
     initializeCropHandler({
-        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img,
-        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage,
-        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight,
-        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData
+        cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
+        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
+        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
+        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData,
+        redrawWorker // Add redrawWorker here
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
@@ -325,13 +325,17 @@ toggleOriginalButton.addEventListener('click', () => {
     }
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState).catch(err => {
+    redrawImage(
+        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+    ).catch(err => {
         console.error("Toggle redraw failed:", err);
         isShowingOriginal = !isShowingOriginal;
         toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
 });
 
+// Touchend listener
 toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
@@ -348,6 +352,18 @@ toggleOriginalButton.addEventListener('touchend', (e) => {
         isShowingOriginal = !isShowingOriginal;
         toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
+});
+
+// Update touchend listener similarly
+toggleOriginalButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image not loaded");
+        return;
+    }
+    isShowingOriginal = !isShowingOriginal;
+    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    ctx.drawImage(isShowingOriginal ? trueOriginalImage : fullResCanvas, 0, 0, canvas.width, canvas.height); // Direct draw instead of redrawImage
 });
 
 img.onload = function () {
@@ -414,8 +430,12 @@ img.onload = function () {
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         uploadNewPhotoButton.style.display = 'block';
         canvas.style.display = 'block';
+    }).catch(err => {
+        console.error("Failed to redraw image on load:", err);
+        canvas.style.display = 'block';
     });
 };
+
 
 downloadButton.addEventListener('click', () => {
     const popup = document.createElement('div');
@@ -556,7 +576,6 @@ downloadButton.addEventListener('click', () => {
 
 let isRedrawing = false;
 function saveImageState(isOriginal = false) {
-    if (!ctx) return;
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     if (isOriginal) {
         history = [{ filters: { ...settings }, imageData }];
@@ -613,13 +632,13 @@ function handleRedo(e) {
             input.value = settings[input.id];
         });
         updateControlIndicators();
-
+        
         const activeImage = (cropModal.style.display === 'block' && cropImage.complete && cropImage.naturalWidth !== 0) ? cropImage : img;
         if (!activeImage || !activeImage.complete || activeImage.naturalWidth === 0) {
             console.error("handleRedo: No valid image available", activeImage);
             return;
         }
-
+        
         redrawImage(
             ctx, canvas, fullResCanvas, fullResCtx, activeImage, settings, noiseSeed,
             isShowingOriginal, trueOriginalImage, modal, modalImage, false
@@ -657,7 +676,7 @@ cropImageButton.addEventListener('click', (e) => {
         console.error("No image source available to crop");
         return;
     }
-    showCropModal(img.src);
+    showCropModal(img.src); // Pass img.src
 });
 
 cropImageButton.addEventListener('touchend', (e) => {
@@ -666,7 +685,7 @@ cropImageButton.addEventListener('touchend', (e) => {
         console.error("No image source available to crop");
         return;
     }
-    showCropModal(img.src);
+    showCropModal(img.src); // Pass img.src
 });
 
 restoreButton.addEventListener('click', () => {
@@ -705,10 +724,12 @@ restoreButton.addEventListener('click', () => {
             isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
         ).then(() => {
             originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-            if (ctx) ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         });
     }
 });
+
+
 
 let isDraggingSlider = false;
 let tempSettings = {};
@@ -811,6 +832,7 @@ canvas.addEventListener('click', (e) => {
             modalControls.innerHTML = '';
             modalControls.appendChild(clonedControls);
 
+            // Sync modal inputs with current settings
             const modalInputs = modalControls.querySelectorAll('input[type="range"]');
             modalInputs.forEach(input => {
                 input.value = settings[input.id];
@@ -844,13 +866,14 @@ canvas.addEventListener('click', (e) => {
 canvas.addEventListener('touchend', (e) => {
     if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
         e.preventDefault();
+        // Optional: Add touch-specific behavior here if desired
     }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
     isTriggering = false;
     cleanupFileInput();
-    updateControlIndicators();
+    updateControlIndicators(); // Ensure indicators are set on load
 });
 
 document.addEventListener('keydown', (e) => {
@@ -892,27 +915,3 @@ function initialize() {
     updateControlIndicators();
 }
 initialize();
-
-// Consolidated exports
-export {
-    redrawWorker,
-    canvas,
-    ctx,
-    img,
-    fullResCanvas,
-    fullResCtx,
-    originalWidth,
-    originalHeight,
-    previewWidth,
-    previewHeight,
-    settings,
-    noiseSeed,
-    trueOriginalImage,
-    originalUploadedImage,
-    isShowingOriginal,
-    modal,
-    modalImage,
-    initialCropRect,
-    originalImageData,
-    initialRotation
-};
