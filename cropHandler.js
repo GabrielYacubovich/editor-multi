@@ -3,7 +3,6 @@ import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { clamp, debounce } from './utils.js';
 import { img, fullResCanvas, fullResCtx, canvas, ctx, originalWidth, originalHeight, trueOriginalImage, originalUploadedImage, previewWidth, previewHeight, originalImageData, initialCropRect, initialRotation } from './script.js';
-
 let cropModal, cropCanvas, cropCtx, originalFullResImage, modal, modalImage, 
     uploadNewPhotoButton, saveImageState;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
@@ -289,12 +288,12 @@ function setupCropControls() {
                     showLoadingIndicator(false);
                 });
     
-            const previewTempCanvas = document.createElement('canvas');
-            previewTempCanvas.width = canvas.width;
-            previewTempCanvas.height = canvas.height;
-            const previewTempCtx = previewTempCanvas.getContext('2d');
-            previewTempCtx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
-            originalImageData = previewTempCtx.getImageData(0, 0, canvas.width, canvas.height);
+                const previewTempCanvas = document.createElement('canvas');
+                previewTempCanvas.width = canvas.width;
+                previewTempCanvas.height = canvas.height;
+                const previewTempCtx = previewTempCanvas.getContext('2d');
+                previewTempCtx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+                originalImageData = previewTempCtx.getImageData(0, 0, canvas.width, canvas.height);
     
             initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
             initialRotation = rotation;

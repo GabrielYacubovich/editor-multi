@@ -428,9 +428,6 @@ img.onload = function () {
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         uploadNewPhotoButton.style.display = 'block';
         canvas.style.display = 'block';
-    }).catch(err => {
-        console.error("Failed to redraw image on load:", err);
-        canvas.style.display = 'block';
     });
 };
 
@@ -923,4 +920,4 @@ export let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: tru
 export let originalWidth, originalHeight, settings, noiseSeed, trueOriginalImage = new Image(), isShowingOriginal;
 export let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
 export let initialRotation = 0;
-export { modal, modalImage };
+export { modal, modalImage, originalImageData }; // Add originalImageData to exports
