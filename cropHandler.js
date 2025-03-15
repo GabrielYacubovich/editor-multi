@@ -205,15 +205,12 @@ function setupCropControls(unfilteredCanvas) {
             return;
         }
     
-        // Close modal and force UI update
         closeModal(cropModal);
         console.log("Modal closed, display:", cropModal.style.display);
     
-        // Use requestAnimationFrame to ensure repaint
         requestAnimationFrame(() => {
             showLoadingIndicator(true);
     
-            // Wrap cropping in a Promise to offload work
             new Promise((resolve) => {
                 const origWidth = cropImage.width;
                 const origHeight = cropImage.height;
@@ -252,7 +249,7 @@ function setupCropControls(unfilteredCanvas) {
                     0, 0, cropWidth, cropHeight
                 );
     
-                resolve(tempCanvas);
+                resolve(tempCanvas); // Pass only tempCanvas
             })
             .then((tempCanvas) => {
                 img.src = tempCanvas.toDataURL('image/png');
@@ -264,6 +261,7 @@ function setupCropControls(unfilteredCanvas) {
                 fullResCtx.drawImage(tempCanvas, 0, 0);
     
                 if (redrawWorker) {
+                    const tempCtx = tempCanvas.getContext('2d'); // Re-get context here
                     const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
                     redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: tempCanvas.width, height: tempCanvas.height });
                     redrawWorker.onmessage = (e) => {
