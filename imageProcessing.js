@@ -378,25 +378,28 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
         return new Promise((resolve, reject) => {
             redrawWorker.onmessage = (e) => {
                 fullResCtx.putImageData(e.data.imageData, 0, 0);
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                if (isShowingOriginal && trueOriginalImage.complete) {
-                    ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-                } else {
-                    ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-                }
-                // Only update modalImage if modal is visible, and debounce it
-                if (modal?.style.display === 'block') {
-                    setTimeout(() => {
-                        modalImage.src = canvas.toDataURL('image/png');
-                    }, 0); // Offload to next tick
-                }
-                if (saveState && saveImageStateCallback) {
-                    saveImageStateCallback();
-                }
-                showLoadingIndicator(false);
-                resolve();
+                requestAnimationFrame(() => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    if (isShowingOriginal && trueOriginalImage.complete) {
+                        ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
+                    } else {
+                        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+                    }
+                    if (saveState && saveImageStateCallback) {
+                        requestAnimationFrame(() => {
+                            saveImageStateCallback(); // Split this out
+                        });
+                    }
+                    showLoadingIndicator(false);
+                    if (modal?.style.display === 'block') {
+                        setTimeout(() => {
+                            modalImage.src = canvas.toDataURL('image/png');
+                        }, 0);
+                    }
+                    resolve();
+                });
             };
             redrawWorker.onerror = (err) => {
                 console.error("Worker error:", err);

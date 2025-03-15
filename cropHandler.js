@@ -78,7 +78,7 @@ function setupCropControls() {
             <input type="range" id="rotation" min="-180" max="180" value="${rotation}">
             <span id="rotation-value">${rotation}°</span>
         </div>
-        <div class="crop-button-group">
+        <div class="crop-butconfirmBtn.addEventListener('click', () => {n-group">
             <button id="crop-restore">Restaurar</button>
             <button id="crop-upload">Subir Imagen</button>
             <button id="crop-confirm">Continuar</button>
@@ -176,85 +176,36 @@ function setupCropControls() {
                 drawCropOverlay();
             });
     });
-    confirmBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!cropImage.complete || cropImage.naturalWidth === 0) {
-            console.error("Confirm failed: cropImage not loaded", cropImage);
-            return;
-        }
-        closeModal(cropModal);
-        showLoadingIndicator(true);
-    
-        const origWidth = cropImage.width;
-        const origHeight = cropImage.height;
-        const angleRad = rotation * Math.PI / 180;
-        const cosA = Math.abs(Math.cos(angleRad));
-        const sinA = Math.abs(Math.sin(angleRad));
-        const fullRotatedWidth = Math.ceil(origWidth * cosA + origHeight * sinA);
-        const fullRotatedHeight = Math.ceil(origWidth * sinA + origHeight * cosA);
-        const fullRotatedCanvas = document.createElement('canvas');
-        fullRotatedCanvas.width = fullRotatedWidth;
-        fullRotatedCanvas.height = fullRotatedHeight;
-        const fullRotatedCtx = fullRotatedCanvas.getContext('2d');
-        fullRotatedCtx.imageSmoothingEnabled = true;
-        fullRotatedCtx.imageSmoothingQuality = 'high';
-        fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
-        fullRotatedCtx.rotate(angleRad);
-        fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
-        fullRotatedCtx.drawImage(trueOriginalImage, 0, 0, origWidth, origHeight);
-    
-        const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
-        const cropX = cropRect.x / scaleFactor;
-        const cropY = cropRect.y / scaleFactor;
-        const cropWidth = Math.round(cropRect.width / scaleFactor);
-        const cropHeight = Math.round(cropRect.height / scaleFactor);
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = cropWidth;
-        tempCanvas.height = cropHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.imageSmoothingEnabled = true;
-        tempCtx.imageSmoothingQuality = 'high';
-        tempCtx.drawImage(
-            fullRotatedCanvas,
-            cropX, cropY, cropWidth, cropHeight,
-            0, 0, cropWidth, cropHeight
-        );
-    
-        // Update img and originals
-        img.src = tempCanvas.toDataURL('image/png');
-        originalUploadedImage.src = img.src;
-        trueOriginalImage.src = img.src;
-    
-        // Update fullResCanvas dimensions and redraw with filters
-        fullResCanvas.width = cropWidth;
-        fullResCanvas.height = cropHeight;
-        fullResCtx.drawImage(tempCanvas, 0, 0);
-    
-        if (redrawWorker) {
-            const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
-            redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: cropWidth, height: cropHeight });
-            redrawWorker.onmessage = (e) => {
-                fullResCtx.putImageData(e.data.imageData, 0, 0);
-                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                showLoadingIndicator(false);
-            };
-        } else {
-            redrawImage(
-                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-            ).then(() => {
-                originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                showLoadingIndicator(false);
-            }).catch(err => {
-                console.error("Redraw failed in fallback:", err);
-                showLoadingIndicator(false);
-            });
-        }
-    
-        initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
-        initialRotation = rotation;
-    });
+    // cropHandler.js, within initializeCropHandler
+confirmBtn.addEventListener('click', () => {
+    if (!cropImage.complete || cropImage.naturalWidth === 0) {
+        console.error("confirmBtn: cropImage not fully loaded");
+        return;
+    }
+    confirmBtn.disabled = true;
+    const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
+    const rotatedWidth = rotation % 180 === 0 ? originalCropRect.width : originalCropRect.height;
+    const rotatedHeight = rotation % 180 === 0 ? originalCropRect.height : originalCropRect.width;
+    fullResCanvas.width = rotatedWidth;
+    fullResCanvas.height = rotatedHeight;
+    fullResCtx.save();
+    fullResCtx.translate(rotatedWidth / 2, rotatedHeight / 2);
+    fullResCtx.rotate(rotation * Math.PI / 180);
+    fullResCtx.drawImage(cropImage, originalCropRect.x, originalCropRect.y, originalCropRect.width, originalCropRect.height, -rotatedWidth / 2, -rotatedHeight / 2, rotatedWidth, rotatedHeight);
+    fullResCtx.restore();
+    img.src = fullResCanvas.toDataURL('image/png');
+    trueOriginalImage.src = fullResCanvas.toDataURL('image/png');
+    if (window.Worker && typeof redrawWorker !== 'undefined') {
+        const imageData = fullResCtx.getImageData(0, 0, fullResCanvas.width, fullResCanvas.height);
+        redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: fullResCanvas.width, height: fullResCanvas.height });
+    } else {
+        redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState);
+    }
+    cropModal.style.display = 'none'; // Close the modal
+    uploadNewPhotoButton.style.display = 'block';
+    canvas.style.display = 'block';
+    confirmBtn.disabled = false;
+});
     
     const debouncedConfirmClick = debounce(() => {
         confirmBtn.click(); // Minimal work here
