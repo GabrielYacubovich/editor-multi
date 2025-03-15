@@ -51,14 +51,14 @@ export function showCropModal(imageSrc) {
         originalCropRect = { x: 0, y: 0, width: cropImage.width, height: cropImage.height };
         originalRotation = 0;
 
-        // Set initial crop rect (can be adjusted later)
+        // Set initial crop rect to match full canvas size (max image size)
         cropRect = {
-            x: canvasWidth * 0.1,
-            y: canvasHeight * 0.1,
-            width: canvasWidth * 0.8,
-            height: canvasHeight * 0.8
+            x: 0,
+            y: 0,
+            width: canvasWidth,
+            height: canvasHeight
         };
-        initialCropRect = { ...cropRect }; // Initial state matches first display
+        initialCropRect = { ...cropRect }; // Initial state matches full size
         initialRotation = 0;
 
         rotation = 0;
@@ -133,8 +133,8 @@ function setupCropControls() {
         rotationInput.value = 0;
         rotationValue.textContent = '0°';
 
-        const maxCanvasWidth = window.innerWidth - 0;
-        const maxCanvasHeight = window.innerHeight - 0;
+        const maxCanvasWidth = window.innerWidth - 100;
+        const maxCanvasHeight = window.innerHeight - 250;
         let width = trueOriginalImage.width;
         let height = trueOriginalImage.height;
         const ratio = width / height;
@@ -331,8 +331,8 @@ function drawCropOverlay() {
     const fullRotatedWidth = Math.ceil(originalWidth * cosA + originalHeight * sinA);
     const fullRotatedHeight = Math.ceil(originalWidth * sinA + originalHeight * cosA);
 
-    const maxCanvasWidth = window.innerWidth - 0;
-    const maxCanvasHeight = window.innerHeight - 0;
+    const maxCanvasWidth = window.innerWidth - 100;
+    const maxCanvasHeight = window.innerHeight - 250;
     const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
 
     const prevWidth = cropCanvas.width;
