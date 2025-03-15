@@ -277,6 +277,8 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d', { willReadFrequently: true });
     setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
@@ -284,8 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
         trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
         settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
-        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData,
-        redrawWorker // Add redrawWorker here
+        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
@@ -916,9 +917,9 @@ function initialize() {
 }
 initialize();
 
+export let canvas = null; // Initialize as null
+export let ctx = null;
 export let img = new Image();
 export let fullResCanvas = document.createElement('canvas');
-export let fullResCtx = fullResCanvas.getContext('2d');
-export let canvas = document.getElementById('canvas');
-export let ctx = canvas.getContext('2d');
+export let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
 export let originalWidth, originalHeight, settings, noiseSeed, trueOriginalImage = new Image(), isShowingOriginal;

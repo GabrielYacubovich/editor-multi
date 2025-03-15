@@ -4,28 +4,25 @@ import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, ap
 import { clamp, debounce } from './utils.js';
 import { img, fullResCanvas, fullResCtx, canvas, ctx, originalWidth, originalHeight, trueOriginalImage, originalUploadedImage, previewWidth, previewHeight, originalImageData, initialCropRect, initialRotation } from './script.js';
 
-let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
-    trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
-    uploadNewPhotoButton, saveImageState, originalImageData; // Removed redrawWorker from here
+let cropModal, cropCanvas, cropCtx, originalFullResImage, modal, modalImage, 
+    uploadNewPhotoButton, saveImageState;
 let cropRect = { x: 0, y: 0, width: 0, height: 0 };
-let initialCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Last confirmed state
-let initialRotation = 0; // Last confirmed rotation
-let originalCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Original uploaded state
-let originalRotation = 0; // Original uploaded rotation (typically 0)
+let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
+let initialRotation = 0;
+let originalCropRect = { x: 0, y: 0, width: 0, height: 0 };
+let originalRotation = 0;
 let rotation = 0;
 let isDragging = false;
 let startX, startY;
 let lockAspectRatio = false;
 let aspectRatio = 1;
 let settings, noiseSeed, isShowingOriginal;
-let originalWidth, originalHeight, previewWidth, previewHeight;
 
 export function initializeCropHandler(options) {
     ({ cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
        trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
        settings, noiseSeed, isShowingOriginal, originalWidth, originalHeight, 
        previewWidth, previewHeight, uploadNewPhotoButton, saveImageState, originalImageData } = options);
-    // No need to assign redrawWorker here; it's already imported
     setupModal(cropModal, false);
 }
 
