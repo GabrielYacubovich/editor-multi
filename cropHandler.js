@@ -36,60 +36,54 @@ export function setTriggerFileUpload(func) {
 
 export function showCropModal(dataURL = null) {
     if (!dataURL) {
-        // Re-showing crop modal with current image
+        // Existing logic for re-showing crop modal with current image
         cropModal.style.display = 'block';
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = img.width;
-        tempCanvas.height = img.height;
+        tempCanvas.width = trueOriginalImage.width;
+        tempCanvas.height = trueOriginalImage.height;
         const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, 0, 0);
-        
-        cropImage.src = tempCanvas.toDataURL('image/png');
-        cropImage.onload = () => {
-            rotation = initialRotation;
-            setupCropControls();
-            drawCropOverlay();
-        };
+        tempCtx.drawImage(trueOriginalImage, 0, 0);
+        applyBasicFiltersManually(tempCtx, tempCanvas, settings);
+        applyAdvancedFilters(tempCtx, tempCanvas, noiseSeed, 1)
+            .then(() => applyGlitchEffects(tempCtx, tempCanvas, noiseSeed, 1))
+            .then(() => applyComplexFilters(tempCtx, tempCanvas, noiseSeed, 1))
+            .then(() => {
+                cropImage.src = tempCanvas.toDataURL('image/png');
+                cropImage.onload = () => {
+                    rotation = initialRotation;
+                    setupCropControls();
+                    drawCropOverlay();
+                };
+            });
     } else {
         // New image uploaded
         originalUploadedImage.src = dataURL;
         cropImage.src = dataURL;
         rotation = 0;
+        initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
         initialRotation = 0;
         cropModal.style.display = 'block';
-    }
-    
-    if (cropImage.complete && cropImage.naturalWidth !== 0) {
-        const maxCanvasWidth = window.innerWidth - 100;
-        const maxCanvasHeight = window.innerHeight - 250;
-        const originalWidth = cropImage.width;
-        const originalHeight = cropImage.height;
-        const angleRad = rotation * Math.PI / 180;
-        const cosA = Math.abs(Math.cos(angleRad));
-        const sinA = Math.abs(Math.sin(angleRad));
-        const fullRotatedWidth = Math.ceil(originalWidth * cosA + originalHeight * sinA);
-        const fullRotatedHeight = Math.ceil(originalWidth * sinA + originalHeight * cosA);
-        const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
-        
-        cropCanvas.width = Math.round(fullRotatedWidth * scale);
-        cropCanvas.height = Math.round(fullRotatedHeight * scale);
-        cropCanvas.dataset.scaleFactor = scale;
-        
-        // Set original state (full image, no rotation)
-        originalCropRect = { x: 0, y: 0, width: originalWidth, height: originalHeight };
-        
-        // Set initial crop rect to full canvas size
-        cropRect = { 
-            x: 0, 
-            y: 0, 
-            width: cropCanvas.width, 
-            height: cropCanvas.height 
+        cropImage.onload = () => {
+            const maxCanvasWidth = window.innerWidth - 100;
+            const maxCanvasHeight = window.innerHeight - 250;
+            const originalWidth = cropImage.width;
+            const originalHeight = cropImage.height;
+            const angleRad = rotation * Math.PI / 180;
+            const cosA = Math.abs(Math.cos(angleRad));
+            const sinA = Math.abs(Math.sin(angleRad));
+            const fullRotatedWidth = Math.ceil(originalWidth * cosA + originalHeight * sinA);
+            const fullRotatedHeight = Math.ceil(originalWidth * sinA + originalHeight * cosA);
+            const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
+            cropCanvas.width = Math.round(fullRotatedWidth * scale);
+            cropCanvas.height = Math.round(fullRotatedHeight * scale);
+            cropCanvas.dataset.scaleFactor = scale;
+            cropRect = { x: 0, y: 0, width: cropCanvas.width, height: cropCanvas.height };
+            setupCropControls();
+            drawCropOverlay();
         };
-        
-        initialCropRect = { ...cropRect };
-        
-        setupCropControls();
-        drawCropOverlay();
+    }
+    if (cropImage.complete && cropImage.naturalWidth !== 0) {
+        cropImage.onload();
     }
 }
 
