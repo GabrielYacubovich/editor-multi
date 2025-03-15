@@ -1,7 +1,7 @@
 
 // imageProcessing.js
 import { showLoadingIndicator } from './domUtils.js';
-
+import { redrawWorker } from './script.js'; // Add this at the top
 // Basic Filters
 function applyBasicFiltersManually(ctx, canvas, settings) {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -372,7 +372,7 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
     fullResCanvas.height = img.height;
     fullResCtx.drawImage(img, 0, 0);
 
-    if (window.Worker && typeof redrawWorker !== 'undefined' && redrawWorker instanceof Worker) {
+    if (window.Worker && redrawWorker && redrawWorker instanceof Worker) { // Simplified condition
         console.log("Using Web Worker for redraw");
         const imageData = fullResCtx.getImageData(0, 0, img.width, img.height);
         return new Promise((resolve, reject) => {
@@ -403,8 +403,9 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
             redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: img.width, height: img.height });
         });
     } else {
-        console.warn("Falling back to main thread redraw");
-        await new Promise(resolve => setTimeout(resolve, 0));
+        console.warn("Falling back to main thread redraw - Worker unavailable");
+        console.log("Worker check:", { windowWorker: !!window.Worker, redrawWorkerDefined: !!redrawWorker, isWorker: redrawWorker instanceof Worker });
+        await new Promise(resolve => setTimeout(resolve, 50)); // Yield with slight delay
         applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
         await applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
         await applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
