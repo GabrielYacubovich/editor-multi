@@ -1,7 +1,7 @@
 
 // imageProcessing.js
 import { showLoadingIndicator } from './domUtils.js';
-
+import { img, fullResCanvas, fullResCtx, canvas, ctx, originalWidth, originalHeight, settings, noiseSeed, trueOriginalImage, isShowingOriginal, modal, modalImage } from './script.js';
 // Basic Filters
 function applyBasicFiltersManually(ctx, canvas, settings) {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -361,7 +361,7 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 
 // Redraw Image
 // In imageProcessing.js
-function redrawImage(saveState = false) {
+export function redrawImage(saveState = false) {
     console.log("redrawImage called with img:", img.src);
     showLoadingIndicator(true);
     fullResCanvas.width = originalWidth;
@@ -385,11 +385,6 @@ function redrawImage(saveState = false) {
                 ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
             } else {
-                if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
-                    console.error("fullResCanvas still invalid after filters");
-                    showLoadingIndicator(false);
-                    return;
-                }
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
                 ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);

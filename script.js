@@ -3,8 +3,8 @@ import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
 
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d', { willReadFrequently: true });
+window.canvas = document.getElementById('canvas');
+window.ctx = canvas.getContext('2d', { willReadFrequently: true });
 const controls = document.querySelectorAll('.controls input');
 const undoButton = document.getElementById('undo');
 const redoButton = document.getElementById('redo');
@@ -19,16 +19,16 @@ const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
 const cropCtx = cropCanvas.getContext('2d');
 const previewModal = document.getElementById('preview-modal');
-let img = new Image();
+window.img = new Image();
 let originalImageData = null;
-let noiseSeed = Math.random();
-let fullResCanvas = document.createElement('canvas');
-let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
-let isShowingOriginal = false;
+window.noiseSeed = Math.random();
+window.fullResCanvas = document.createElement('canvas');
+window.fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
+window.isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
-let trueOriginalImage = new Image();
-let settings = {
+window.trueOriginalImage = new Image();
+window.settings = {
     brightness: 100,
     contrast: 100,
     grayscale: 0,
@@ -53,7 +53,7 @@ let settings = {
 let history = [{ filters: { ...settings }, imageData: null }];
 let redoHistory = [];
 let lastAppliedEffect = null;
-let originalWidth, originalHeight, previewWidth, previewHeight;
+window.originalWidth, originalHeight, previewWidth, previewHeight;
 
 let isTriggering = false;
 let fileInput = null;
@@ -915,3 +915,10 @@ function initialize() {
     updateControlIndicators();
 }
 initialize();
+
+export let img = new Image();
+export let fullResCanvas = document.createElement('canvas');
+export let fullResCtx = fullResCanvas.getContext('2d');
+export let canvas = document.getElementById('canvas');
+export let ctx = canvas.getContext('2d');
+export let originalWidth, originalHeight, settings, noiseSeed, trueOriginalImage = new Image(), isShowingOriginal;

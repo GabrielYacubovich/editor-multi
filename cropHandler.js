@@ -2,9 +2,10 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { clamp, debounce } from './utils.js';
+import { img, fullResCanvas, fullResCtx, canvas, ctx, originalWidth, originalHeight, trueOriginalImage, originalUploadedImage, previewWidth, previewHeight, originalImageData, initialCropRect, initialRotation } from './globals.js';
 import { redrawWorker } from './script.js'; // Import redrawWorker
+import { redrawImage } from './imageProcessing.js';
 
-export let cropImage = new Image();
 let cropModal, cropCanvas, cropCtx, canvas, ctx, fullResCanvas, fullResCtx, img, 
     trueOriginalImage, originalUploadedImage, originalFullResImage, modal, modalImage, 
     uploadNewPhotoButton, saveImageState, originalImageData; // Removed redrawWorker from here
@@ -280,13 +281,11 @@ function setupCropControls() {
             canvas.width = Math.round(previewWidth);
             canvas.height = Math.round(previewHeight);
     
-            // Ensure redraw happens even if img isn't fully loaded yet
             console.log("Calling redrawImage with img.src:", img.src);
             redrawImage(true)
                 .then(() => {
                     console.log("Redraw complete, updating originalFullResImage");
                     originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                    // Force canvas update
                     ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
                 })
                 .catch((err) => {
@@ -297,7 +296,6 @@ function setupCropControls() {
                     showLoadingIndicator(false);
                 });
     
-            // Update originalImageData for toggleOriginalButton
             const previewTempCanvas = document.createElement('canvas');
             previewTempCanvas.width = canvas.width;
             previewTempCanvas.height = canvas.height;
@@ -309,7 +307,6 @@ function setupCropControls() {
             initialRotation = rotation;
         };
     
-        // Always process asynchronously, wait for trueOriginalImage if needed
         if (trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
             Promise.resolve().then(processCrop);
         } else {
@@ -639,3 +636,5 @@ let triggerFileUpload = () => console.error("triggerFileUpload not set in cropHa
 export function setTriggerFileUpload(fn) {
     triggerFileUpload = fn;
 }
+
+export let cropImage = new Image();
