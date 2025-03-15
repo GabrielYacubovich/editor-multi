@@ -204,12 +204,16 @@ function setupCropControls(unfilteredCanvas) {
             return;
         }
     
-        closeModal(cropModal); // Close modal first
+        // Close modal and force immediate hide
+        closeModal(cropModal);
+        cropModal.style.visibility = 'hidden'; // Extra measure to hide
         console.log("Modal closed, display:", cropModal.style.display);
-        showLoadingIndicator(true); // Show loading immediately after
     
-        // Yield to browser to ensure modal closure renders
-        requestAnimationFrame(() => {
+        // Show loading indicator
+        showLoadingIndicator(true);
+    
+        // Use setTimeout to yield control and ensure repaint
+        setTimeout(() => {
             try {
                 const origWidth = cropImage.width;
                 const origHeight = cropImage.height;
@@ -265,7 +269,6 @@ function setupCropControls(unfilteredCanvas) {
                 });
     
                 loadImage.then(() => {
-                    // Preview size calculation (from original)
                     const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
                     const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
                     const minPreviewDimension = 800;
@@ -329,7 +332,7 @@ function setupCropControls(unfilteredCanvas) {
                 console.error("Cropping failed:", error);
                 showLoadingIndicator(false);
             }
-        });
+        }, 0); // Yield to event loop
     });
     
     const debouncedConfirmClick = debounce(() => {

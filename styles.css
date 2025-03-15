@@ -65,7 +65,12 @@ body {
     min-width: 250px;
 }
 #crop-modal {
-    transition: none !important;
+    display: block;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+#crop-modal.hidden {
+    opacity: 0;
 }
 #sliders-wrapper {
     width: 100%;
