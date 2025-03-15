@@ -13,8 +13,6 @@ const downloadButton = document.getElementById('download');
 const cropImageButton = document.getElementById('crop-image-button');
 const uploadNewPhotoButton = document.getElementById('upload-new-photo');
 const toggleOriginalButton = document.getElementById('toggle-original');
-const modal = document.getElementById('image-modal');
-const modalImage = document.getElementById('modal-image');
 const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
 const cropCtx = cropCanvas.getContext('2d');
@@ -28,6 +26,8 @@ window.isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
 window.trueOriginalImage = new Image();
+let modal = null;
+let modalImage = null; // Change to let and initialize as null
 window.settings = {
     brightness: 100,
     contrast: 100,
@@ -326,10 +326,7 @@ toggleOriginalButton.addEventListener('click', () => {
     }
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    redrawImage(
-        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
-    ).catch(err => {
+    redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState).catch(err => {
         console.error("Toggle redraw failed:", err);
         isShowingOriginal = !isShowingOriginal;
         toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
@@ -924,5 +921,6 @@ export let img = new Image();
 export let fullResCanvas = document.createElement('canvas');
 export let fullResCtx = fullResCanvas.getContext('2d', { willReadFrequently: true });
 export let originalWidth, originalHeight, settings, noiseSeed, trueOriginalImage = new Image(), isShowingOriginal;
-export let initialCropRect = { x: 0, y: 0, width: 0, height: 0 }; // Add this
-export let initialRotation = 0; // Add this
+export let initialCropRect = { x: 0, y: 0, width: 0, height: 0 };
+export let initialRotation = 0;
+export { modal, modalImage };
