@@ -133,8 +133,8 @@ function setupCropControls() {
         rotationInput.value = 0;
         rotationValue.textContent = '0°';
 
-        const maxCanvasWidth = window.innerWidth - 100;
-        const maxCanvasHeight = window.innerHeight - 250;
+        const maxCanvasWidth = window.innerWidth - 0;
+        const maxCanvasHeight = window.innerHeight - 0;
         let width = trueOriginalImage.width;
         let height = trueOriginalImage.height;
         const ratio = width / height;
@@ -331,8 +331,8 @@ function drawCropOverlay() {
     const fullRotatedWidth = Math.ceil(originalWidth * cosA + originalHeight * sinA);
     const fullRotatedHeight = Math.ceil(originalWidth * sinA + originalHeight * cosA);
 
-    const maxCanvasWidth = window.innerWidth - 100;
-    const maxCanvasHeight = window.innerHeight - 250;
+    const maxCanvasWidth = window.innerWidth - 0;
+    const maxCanvasHeight = window.innerHeight - 0;
     const scale = Math.min(maxCanvasWidth / fullRotatedWidth, maxCanvasHeight / fullRotatedHeight, 1);
 
     const prevWidth = cropCanvas.width;
