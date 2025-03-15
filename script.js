@@ -2,7 +2,7 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
 import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload } from './cropHandler.js';
-
+import { cropImage } from './cropHandler.js';
 // Declare variables in module scope
 let canvas = document.getElementById('canvas');
 let ctx = canvas ? canvas.getContext('2d', { willReadFrequently: true }) : null;
@@ -903,5 +903,6 @@ export {
     isShowingOriginal,
     modal,
     modalImage,
+    initialCropRect,
     originalImageData
 };

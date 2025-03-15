@@ -275,18 +275,18 @@ function setupCropControls() {
     
             console.log("Calling redrawImage with img.src:", img.src);
             redrawImage(true)
-                .then(() => {
-                    console.log("Redraw complete, updating originalFullResImage");
-                    originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                    ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-                })
-                .catch((err) => {
-                    console.error("Redraw failed:", err);
-                })
-                .finally(() => {
-                    console.log("Process complete");
-                    showLoadingIndicator(false);
-                });
+    .then(() => {
+        console.log("Redraw complete, updating originalFullResImage");
+        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+    })
+    .catch((err) => {
+        console.error("Redraw failed:", err);
+    })
+    .finally(() => {
+        console.log("Process complete");
+        showLoadingIndicator(false);
+    });
     
                 const previewTempCanvas = document.createElement('canvas');
                 previewTempCanvas.width = canvas.width;
@@ -303,11 +303,17 @@ function setupCropControls() {
             Promise.resolve().then(processCrop);
         } else {
             console.log("Waiting for trueOriginalImage to load");
-            const loadImage = new Promise((resolve) => {
+            const loadImage = new Promise((resolve, reject) => {
                 trueOriginalImage.onload = () => resolve();
-                trueOriginalImage.onerror = () => resolve();
+                trueOriginalImage.onerror = () => reject(new Error("Failed to load trueOriginalImage"));
             });
-            loadImage.then(processCrop);
+            loadImage
+                .then(processCrop)
+                .catch((err) => {
+                    console.error(err);
+                    alert("Error loading the original image. Please try again.");
+                    showLoadingIndicator(false);
+                });
         }
     });
     
