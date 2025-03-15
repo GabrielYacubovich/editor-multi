@@ -78,7 +78,7 @@ function setupCropControls() {
             <input type="range" id="rotation" min="-180" max="180" value="${rotation}">
             <span id="rotation-value">${rotation}°</span>
         </div>
-        <div class="crop-butconfirmBtn.addEventListener('click', () => {n-group">
+        <div class="crop-button-group">
             <button id="crop-restore">Restaurar</button>
             <button id="crop-upload">Subir Imagen</button>
             <button id="crop-confirm">Continuar</button>
