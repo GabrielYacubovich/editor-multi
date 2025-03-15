@@ -361,7 +361,7 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 
 // Redraw Image
 // In imageProcessing.js
-export function redrawImage(saveState = false) {
+function redrawImage(saveState = false) {
     console.log("redrawImage called with img:", img.src);
     showLoadingIndicator(true);
     fullResCanvas.width = originalWidth;
