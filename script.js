@@ -277,10 +277,7 @@ function cleanupFileInput() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    cropModal.style.display = 'none';
-    modal.style.display = 'none';
-    previewModal.style.display = 'none';
-     setupModal(modal, false);
+    setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
     initializeCropHandler({
@@ -292,10 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     setTriggerFileUpload(triggerFileUpload);
     setupCropEventListeners();
-    isTriggering = false;
-    cleanupFileInput();
-    cropRect = { x: 0, y: 0, width: 0, height: 0 };
-    rotation = 0;
 });
 
 uploadNewPhotoButton.addEventListener('click', (e) => {
@@ -342,6 +335,7 @@ toggleOriginalButton.addEventListener('click', () => {
     });
 });
 
+// Touchend listener
 toggleOriginalButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
@@ -358,6 +352,18 @@ toggleOriginalButton.addEventListener('touchend', (e) => {
         isShowingOriginal = !isShowingOriginal;
         toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
+});
+
+// Update touchend listener similarly
+toggleOriginalButton.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
+        console.error("Cannot toggle: Original image not loaded");
+        return;
+    }
+    isShowingOriginal = !isShowingOriginal;
+    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
+    ctx.drawImage(isShowingOriginal ? trueOriginalImage : fullResCanvas, 0, 0, canvas.width, canvas.height); // Direct draw instead of redrawImage
 });
 
 img.onload = function () {
@@ -502,7 +508,7 @@ downloadButton.addEventListener('click', () => {
         const fileType = fileTypeSelect.value;
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
-            fileSizeSpan.textContent = blob ? Math.round(blob.size / 1024) : 'Calculating...';
+            fileSizeSpan.textContent = blob ? Math.round(blob.size / 1024) : 'Calculando...';
         }, fileType, quality);
     }
     updateFileInfo();
@@ -667,17 +673,19 @@ addButtonListeners(redoButton, debouncedRedo);
 cropImageButton.addEventListener('click', (e) => {
     e.preventDefault();
     if (!img.src || img.src === "") {
+        console.error("No image source available to crop");
         return;
     }
-    showCropModal();
+    showCropModal(img.src); // Pass img.src
 });
 
 cropImageButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     if (!img.src || img.src === "") {
+        console.error("No image source available to crop");
         return;
     }
-    showCropModal();
+    showCropModal(img.src); // Pass img.src
 });
 
 restoreButton.addEventListener('click', () => {
@@ -720,7 +728,6 @@ restoreButton.addEventListener('click', () => {
         });
     }
 });
-
 
 
 
