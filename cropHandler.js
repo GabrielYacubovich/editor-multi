@@ -180,17 +180,23 @@ function setupCropControls() {
         e.preventDefault();
         if (!cropImage.complete || cropImage.width === 0 || cropImage.height === 0) {
             console.error("Crop image not loaded or invalid:", cropImage);
-            closeModal(cropModal);
+            cropModal.style.display = 'none';
             return;
         }
     
-        // Close modal immediately and update UI
-        cropModal.style.display = 'none'; // Direct style change for clarity
+        console.log("Closing modal");
+        cropModal.style.display = 'none';
         uploadNewPhotoButton.style.display = 'block';
         showLoadingIndicator(true);
     
-        // Process cropping asynchronously
         const processCrop = () => {
+            console.log("Starting crop process");
+            if (!trueOriginalImage.complete || !trueOriginalImage.src) {
+                console.error("trueOriginalImage not ready:", trueOriginalImage);
+                showLoadingIndicator(false);
+                return;
+            }
+    
             const origWidth = cropImage.width;
             const origHeight = cropImage.height;
             const angleRad = rotation * Math.PI / 180;
@@ -208,6 +214,7 @@ function setupCropControls() {
             fullRotatedCtx.translate(fullRotatedWidth / 2, fullRotatedHeight / 2);
             fullRotatedCtx.rotate(angleRad);
             fullRotatedCtx.translate(-origWidth / 2, -origHeight / 2);
+            console.log("Drawing rotated image, trueOriginalImage:", trueOriginalImage.src);
             fullRotatedCtx.drawImage(trueOriginalImage, 0, 0, origWidth, origHeight);
     
             const scaleFactor = parseFloat(cropCanvas.dataset.scaleFactor) || 1;
@@ -215,6 +222,7 @@ function setupCropControls() {
             const cropY = cropRect.y / scaleFactor;
             const cropWidth = Math.round(cropRect.width / scaleFactor);
             const cropHeight = Math.round(cropRect.height / scaleFactor);
+            console.log("Crop params:", { cropX, cropY, cropWidth, cropHeight, scaleFactor });
     
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = cropWidth;
@@ -228,24 +236,16 @@ function setupCropControls() {
                 0, 0, cropWidth, cropHeight
             );
     
-            img.src = tempCanvas.toDataURL('image/png');
-            originalUploadedImage.src = img.src;
-            trueOriginalImage.src = img.src; // Sync trueOriginalImage
+            console.log("Setting img.src");
+            const croppedDataURL = tempCanvas.toDataURL('image/png');
+            img.src = croppedDataURL;
+            originalUploadedImage.src = croppedDataURL;
+            trueOriginalImage.src = croppedDataURL;
             originalWidth = cropWidth;
             originalHeight = cropHeight;
             fullResCanvas.width = originalWidth;
             fullResCanvas.height = originalHeight;
             fullResCtx.drawImage(tempCanvas, 0, 0);
-    
-            const previewTempCanvas = document.createElement('canvas');
-            previewTempCanvas.width = canvas.width;
-            previewTempCanvas.height = canvas.height;
-            const previewTempCtx = previewTempCanvas.getContext('2d');
-            previewTempCtx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
-            originalImageData = previewTempCtx.getImageData(0, 0, canvas.width, canvas.height);
-    
-            initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
-            initialRotation = rotation;
     
             const maxDisplayWidth = Math.min(1920, window.innerWidth - 100);
             const maxDisplayHeight = Math.min(1080, window.innerHeight - 250);
@@ -276,28 +276,47 @@ function setupCropControls() {
                 }
             }
     
+            console.log("Setting canvas size:", { previewWidth, previewHeight });
             canvas.width = Math.round(previewWidth);
             canvas.height = Math.round(previewHeight);
     
+            // Ensure redraw happens even if img isn't fully loaded yet
+            console.log("Calling redrawImage with img.src:", img.src);
             redrawImage(true)
                 .then(() => {
+                    console.log("Redraw complete, updating originalFullResImage");
                     originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                    // Force canvas update
+                    ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
                 })
                 .catch((err) => {
                     console.error("Redraw failed:", err);
                 })
                 .finally(() => {
+                    console.log("Process complete");
                     showLoadingIndicator(false);
                 });
+    
+            // Update originalImageData for toggleOriginalButton
+            const previewTempCanvas = document.createElement('canvas');
+            previewTempCanvas.width = canvas.width;
+            previewTempCanvas.height = canvas.height;
+            const previewTempCtx = previewTempCanvas.getContext('2d');
+            previewTempCtx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+            originalImageData = previewTempCtx.getImageData(0, 0, canvas.width, canvas.height);
+    
+            initialCropRect = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
+            initialRotation = rotation;
         };
     
-        // Execute processing after a microtask to yield UI thread
-        if (img.complete && img.naturalWidth !== 0) {
+        // Always process asynchronously, wait for trueOriginalImage if needed
+        if (trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
             Promise.resolve().then(processCrop);
         } else {
+            console.log("Waiting for trueOriginalImage to load");
             const loadImage = new Promise((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => resolve();
+                trueOriginalImage.onload = () => resolve();
+                trueOriginalImage.onerror = () => resolve();
             });
             loadImage.then(processCrop);
         }

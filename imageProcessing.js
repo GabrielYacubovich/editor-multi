@@ -361,39 +361,50 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 
 // Redraw Image
 // In imageProcessing.js
-async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, saveState, saveImageStateCallback) {
-    await new Promise(resolve => setTimeout(resolve, 0)); // Yield to main thread
-    if (!img.complete || img.naturalWidth === 0) {
-        console.error("redrawImage: img not loaded", img);
-        showLoadingIndicator(false);
-        return;
-    }
+function redrawImage(saveState = false) {
+    console.log("redrawImage called with img:", img.src);
     showLoadingIndicator(true);
-    fullResCanvas.width = img.width;
-    fullResCanvas.height = img.height;
-    fullResCtx.drawImage(img, 0, 0);
-
+    fullResCanvas.width = originalWidth;
+    fullResCanvas.height = originalHeight;
+    if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
+        console.error("Invalid fullResCanvas dimensions:", fullResCanvas.width, fullResCanvas.height);
+        showLoadingIndicator(false);
+        return Promise.reject("Invalid canvas dimensions");
+    }
+    fullResCtx.clearRect(0, 0, fullResCanvas.width, fullResCanvas.height);
+    fullResCtx.drawImage(img, 0, 0, originalWidth, originalHeight);
     applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
-    await applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
-    await applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
-    await applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    if (isShowingOriginal && trueOriginalImage.complete) {
-        ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-    } else {
-        ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-    }
-
-    if (modal?.style.display === 'block') {
-        modalImage.src = canvas.toDataURL('image/png');
-    }
-    if (saveState && saveImageStateCallback) {
-        saveImageStateCallback();
-    }
-    showLoadingIndicator(false);
+    const scaleFactor = 1;
+    return applyAdvancedFilters(fullResCtx, fullResCanvas, noiseSeed, scaleFactor)
+        .then(() => applyGlitchEffects(fullResCtx, fullResCanvas, noiseSeed, scaleFactor))
+        .then(() => applyComplexFilters(fullResCtx, fullResCanvas, noiseSeed, scaleFactor))
+        .then(() => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (isShowingOriginal && trueOriginalImage.complete && trueOriginalImage.naturalWidth !== 0) {
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
+            } else {
+                if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
+                    console.error("fullResCanvas still invalid after filters");
+                    showLoadingIndicator(false);
+                    return;
+                }
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+            }
+            if (modal.style.display === 'block') {
+                modalImage.src = canvas.toDataURL('image/png');
+            }
+            if (saveState) saveImageState();
+            showLoadingIndicator(false);
+            console.log("redrawImage completed");
+        }).catch(err => {
+            console.error("redrawImage error:", err);
+            showLoadingIndicator(false);
+            throw err;
+        });
 }
 // Utility function
 function clamp(value, min, max) {
