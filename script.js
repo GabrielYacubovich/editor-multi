@@ -318,41 +318,8 @@ function updateControlIndicators() {
     });
 }
 
+
 function handleToggleOriginal(e) {
-    e.preventDefault();
-    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
-        console.error("Cannot toggle: Original image is not loaded");
-        return;
-    }
-
-    isShowingOriginal = !isShowingOriginal;
-    toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-
-    console.log(`Toggling to ${isShowingOriginal ? 'Original' : 'Edited'}`);
-    console.log("Current settings:", settings);
-    console.log("fullResCanvas dimensions:", fullResCanvas.width, fullResCanvas.height);
-
-    redrawImage(
-        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-        isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
-    ).then(() => {
-        console.log(`Toggled to ${isShowingOriginal ? 'Original' : 'Edited'} successfully`);
-        // Force a direct draw to verify canvas update
-        if (isShowingOriginal) {
-            ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-        } else {
-            ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-        }
-        console.log("Canvas redrawn directly after redrawImage");
-    }).catch(err => {
-        console.error("Toggle redraw failed:", err);
-        isShowingOriginal = !isShowingOriginal;
-        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
-    });
-}
-
-toggleOriginalButton.addEventListener('click', handleToggleOriginal);
-toggleOriginalButton.addEventListener('touchend', handleToggleOriginal);function handleToggleOriginal(e) {
     e.preventDefault();
     if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
         console.error("Cannot toggle: Original image is not loaded");
