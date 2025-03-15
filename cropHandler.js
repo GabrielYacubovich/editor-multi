@@ -28,6 +28,10 @@ export function showCropModal(imageSrc) {
         console.error("showCropModal: Invalid or missing imageSrc", imageSrc);
         return;
     }
+    if (!cropCanvas) {
+        console.error("cropCanvas is undefined. Ensure initializeCropHandler is called with a valid cropCanvas.");
+        return;
+    }
     cropImage.src = imageSrc;
     cropImage.onload = () => {
         const displayWidth = Math.min(cropImage.width, window.innerWidth * 0.8);

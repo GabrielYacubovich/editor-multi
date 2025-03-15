@@ -271,6 +271,13 @@ function cleanupFileInput() {
 document.addEventListener('DOMContentLoaded', () => {
     canvas = document.getElementById('canvas');
     ctx = canvas ? canvas.getContext('2d', { willReadFrequently: true }) : null;
+    modal = document.getElementById('image-modal'); // Fix Error 1
+    cropModal = document.getElementById('crop-modal');
+    previewModal = document.getElementById('preview-modal');
+    cropCanvas = document.getElementById('crop-canvas'); // Ensure consistency
+    cropCtx = cropCanvas ? cropCanvas.getContext('2d') : null;
+    if (!cropCanvas) console.error("cropCanvas not found in DOM"); // Debug
+
     setupModal(modal, false);
     setupModal(cropModal, false);
     setupModal(previewModal, true);
