@@ -523,7 +523,7 @@ function resizeCrop(x, y) {
 
 export function setupCropEventListeners() {
     const debouncedStopCropDrag = debounce(stopCropDrag, 100);
-
+    cropCanvas.addEventListener('touchend', debouncedStopCropDrag);
     if (!cropCanvas) {
         console.error("setupCropEventListeners: cropCanvas is undefined. Ensure initializeCropHandler is called first.");
         return;

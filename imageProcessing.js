@@ -362,6 +362,7 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
 // Redraw Image
 // In imageProcessing.js
 async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, saveState, saveImageStateCallback) {
+    await new Promise(resolve => setTimeout(resolve, 0)); // Yield to main thread
     if (!img.complete || img.naturalWidth === 0) {
         console.error("redrawImage: img not loaded", img);
         showLoadingIndicator(false);
