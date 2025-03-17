@@ -1,7 +1,9 @@
-// script.js
+
+import { throttle } from './utils.js';
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters, redrawImage } from './imageProcessing.js';
-import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload, cropState, cropRect, rotation, resetCropState } from './cropHandler.js';
+import { initializeCropHandler, showCropModal, setupCropEventListeners, setTriggerFileUpload, cropState, resetCropState } from './cropHandler.js';
+
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const controls = document.querySelectorAll('.controls input');
@@ -16,8 +18,11 @@ const modal = document.getElementById('image-modal');
 const modalImage = document.getElementById('modal-image');
 const cropModal = document.getElementById('crop-modal');
 const cropCanvas = document.getElementById('crop-canvas');
-const cropCtx = cropCanvas.getContext('2d');
+const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
 const previewModal = document.getElementById('preview-modal');
+const LOW_RES_MAX_WIDTH = 400; // Quick preview size
+const HIGH_RES_MAX_WIDTH = 1920; // Full quality size
+const MAX_CANVAS_HEIGHT = 1080;
 let img = new Image();
 let originalImageData = null;
 let noiseSeed = Math.random();
@@ -52,15 +57,17 @@ let settings = {
 let history = [{ filters: { ...settings }, imageData: null }];
 let redoHistory = [];
 let lastAppliedEffect = null;
+let lastModifiedSlider = null; // Add this line here
 let originalWidth, originalHeight, previewWidth, previewHeight;
 
 let isTriggering = false;
 let fileInput = null;
 
-export let redrawWorker;
+
+// script.js (inside the if (window.Worker) block)
+export let redrawWorker = null;
 if (window.Worker) {
     redrawWorker = new Worker(URL.createObjectURL(new Blob([`
-        // Inline functions from imageProcessing.js
         function clamp(value, min, max) {
             return Math.min(Math.max(value, min), max);
         }
@@ -199,6 +206,106 @@ if (window.Worker) {
                 }
             }
 
+            if (settings['glitch-rgb-split'] > 0) {
+                const intensity = settings['glitch-rgb-split'] / 100;
+                const maxShift = clamp(30 * intensity * (Math.max(width, height) / previewMinDimension), 0, Math.max(width, height) / 8);
+                const tempData = new Uint8ClampedArray(data.length);
+                for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        randomSeed += 1;
+                        const rShift = Math.floor(seededRandom() * maxShift - maxShift / 2);
+                        randomSeed += 1;
+                        const gShift = Math.floor(seededRandom() * maxShift - maxShift / 2);
+                        randomSeed += 1;
+                        const bShift = Math.floor(seededRandom() * maxShift - maxShift / 2);
+                        const rX = clamp(x + rShift, 0, width - 1);
+                        const gX = clamp(x + gShift, 0, width - 1);
+                        const bX = clamp(x + bShift, 0, width - 1);
+                        data[idx] = tempData[(y * width + rX) * 4];
+                        data[idx + 1] = tempData[(y * width + gX) * 4 + 1];
+                        data[idx + 2] = tempData[(y * width + bX) * 4 + 2];
+                    }
+                }
+            }
+
+            if (settings['glitch-chromatic-vertical'] > 0) {
+                const intensity = settings['glitch-chromatic-vertical'] / 100;
+                const maxShift = clamp(50 * intensity * (height / previewMinDimension), 0, height / 8);
+                const tempData = new Uint8ClampedArray(data.length);
+                for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+                for (let y = 0; y < height; y++) {
+                    const shiftY = clamp(y - Math.round(maxShift * Math.sin(randomSeed + y * 0.1)), 0, height - 1);
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        const shiftedIdx = (shiftY * width + x) * 4;
+                        data[idx] = tempData[shiftedIdx];
+                        data[idx + 1] = tempData[shiftedIdx + 1];
+                        data[idx + 2] = tempData[shiftedIdx + 2];
+                    }
+                }
+            }
+
+            if (settings['glitch-chromatic-diagonal'] > 0) {
+                const intensity = settings['glitch-chromatic-diagonal'] / 100;
+                const maxShift = clamp(50 * intensity * (Math.max(width, height) / previewMinDimension), 0, Math.max(width, height) / 8);
+                const tempData = new Uint8ClampedArray(data.length);
+                for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        const shiftX = clamp(x - Math.round(maxShift * Math.sin(randomSeed + (x + y) * 0.05)), 0, width - 1);
+                        const shiftY = clamp(y - Math.round(maxShift * Math.cos(randomSeed + (x + y) * 0.05)), 0, height - 1);
+                        const shiftedIdx = (shiftY * width + shiftX) * 4;
+                        data[idx] = tempData[shiftedIdx];
+                        data[idx + 1] = tempData[shiftedIdx + 1];
+                        data[idx + 2] = tempData[shiftedIdx + 2];
+                    }
+                }
+            }
+
+            if (settings['glitch-pixel-shuffle'] > 0) {
+                const intensity = settings['glitch-pixel-shuffle'] / 100;
+                const blockSize = Math.round(clamp(5 + intensity * 20, 5, Math.min(width, height) / 10));
+                const tempData = new Uint8ClampedArray(data.length);
+                for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+                for (let y = 0; y < height; y += blockSize) {
+                    for (let x = 0; x < width; x += blockSize) {
+                        const randX = clamp(Math.floor(seededRandom() * width), 0, width - blockSize);
+                        const randY = clamp(Math.floor(seededRandom() * height), 0, height - blockSize);
+                        for (let dy = 0; dy < blockSize && y + dy < height; dy++) {
+                            for (let dx = 0; dx < blockSize && x + dx < width; dx++) {
+                                const srcIdx = ((y + dy) * width + (x + dx)) * 4;
+                                const destIdx = ((randY + dy) * width + (randX + dx)) * 4;
+                                data[destIdx] = tempData[srcIdx];
+                                data[destIdx + 1] = tempData[srcIdx + 1];
+                                data[destIdx + 2] = tempData[srcIdx + 2];
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (settings['glitch-wave'] > 0) {
+                const intensity = settings['glitch-wave'] / 100;
+                const amplitude = clamp(20 * intensity * (width / previewMinDimension), 0, width / 8);
+                const frequency = 0.05;
+                const tempData = new Uint8ClampedArray(data.length);
+                for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+                for (let y = 0; y < height; y++) {
+                    const shiftX = Math.round(amplitude * Math.sin(frequency * y + randomSeed));
+                    for (let x = 0; x < width; x++) {
+                        const srcX = clamp(x + shiftX, 0, width - 1);
+                        const idx = (y * width + x) * 4;
+                        const srcIdx = (y * width + srcX) * 4;
+                        data[idx] = tempData[srcIdx];
+                        data[idx + 1] = tempData[srcIdx + 1];
+                        data[idx + 2] = tempData[srcIdx + 2];
+                    }
+                }
+            }
+
             ctx.putImageData(imageData, 0, 0);
         }
 
@@ -208,25 +315,115 @@ if (window.Worker) {
             let imageData = ctx.getImageData(0, 0, width, height);
             let data = imageData.data;
 
+            if (settings['kaleidoscope-segments'] > 0) {
+                const segments = Math.max(1, settings['kaleidoscope-segments']);
+                const offset = clamp((settings['kaleidoscope-offset'] / 100) * Math.min(width, height) / 2, 0, Math.min(width, height) / 2);
+                const tempCanvas = new OffscreenCanvas(width, height);
+                const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+                tempCtx.putImageData(imageData, 0, 0);
+                ctx.clearRect(0, 0, width, height);
+                const centerX = clamp(width / 2 + offset, 0, width);
+                const centerY = clamp(height / 2 + offset, 0, height);
+                const angleStep = (2 * Math.PI) / segments;
+                for (let i = 0; i < segments; i++) {
+                    ctx.save();
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(angleStep * i);
+                    ctx.scale(i % 2 === 0 ? 1 : -1, 1);
+                    ctx.drawImage(tempCanvas, -centerX, -centerY);
+                    ctx.restore();
+                }
+                imageData = ctx.getImageData(0, 0, width, height);
+                data = imageData.data;
+            }
+
+            if (settings['vortex-twist'] > 0) {
+                const intensity = settings['vortex-twist'] / 100;
+                const maxAngle = clamp(intensity * 2 * Math.PI, 0, 2 * Math.PI);
+                const tempData = new Uint8ClampedArray(data.length);
+                for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        const dx = x - centerX;
+                        const dy = y - centerY;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const angle = (1 - dist / maxDist) * maxAngle;
+                        const cosA = Math.cos(angle);
+                        const sinA = Math.sin(angle);
+                        const srcX = clamp(centerX + (dx * cosA - dy * sinA), 0, width - 1);
+                        const srcY = clamp(centerY + (dx * sinA + dy * cosA), 0, height - 1);
+                        const srcIdx = (Math.floor(srcY) * width + Math.floor(srcX)) * 4;
+                        data[idx] = tempData[srcIdx];
+                        data[idx + 1] = tempData[srcIdx + 1];
+                        data[idx + 2] = tempData[srcIdx + 2];
+                    }
+                }
+            }
+
+            if (settings['edge-detect'] > 0) {
+                const intensity = settings['edge-detect'] / 100;
+                const tempData = new Uint8ClampedArray(data.length);
+                for (let i = 0; i < data.length; i++) tempData[i] = data[i];
+                for (let y = 1; y < height - 1; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        const idx = (y * width + x) * 4;
+                        const gx = (
+                            -tempData[((y - 1) * width + (x - 1)) * 4] +
+                            tempData[((y - 1) * width + (x + 1)) * 4] -
+                            2 * tempData[(y * width + (x - 1)) * 4] +
+                            2 * tempData[(y * width + (x + 1)) * 4] -
+                            tempData[((y + 1) * width + (x - 1)) * 4] +
+                            tempData[((y + 1) * width + (x + 1)) * 4]
+                        );
+                        const gy = (
+                            -tempData[((y - 1) * width + (x - 1)) * 4] -
+                            2 * tempData[((y - 1) * width + x) * 4] -
+                            tempData[((y - 1) * width + (x + 1)) * 4] +
+                            tempData[((y + 1) * width + (x - 1)) * 4] +
+                            2 * tempData[((y + 1) * width + x) * 4] +
+                            tempData[((y + 1) * width + (x + 1)) * 4]
+                        );
+                        const gradient = Math.sqrt(gx * gx + gy * gy) * intensity;
+                        const value = clamp(gradient, 0, 255);
+                        data[idx] = value;
+                        data[idx + 1] = value;
+                        data[idx + 2] = value;
+                    }
+                }
+            }
+
             ctx.putImageData(imageData, 0, 0);
         }
 
         self.onmessage = async (e) => {
-            const { imgData, settings, noiseSeed, width, height } = e.data;
-            const offscreenCanvas = new OffscreenCanvas(width, height);
-            const ctx = offscreenCanvas.getContext('2d');
-            ctx.putImageData(imgData, 0, 0);
-            applyBasicFiltersManually(ctx, offscreenCanvas, settings);
-            await applyAdvancedFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
-            await applyGlitchEffects(ctx, offscreenCanvas, settings, noiseSeed, 1);
-            await applyComplexFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
-            const resultData = ctx.getImageData(0, 0, width, height);
-            self.postMessage({ imageData: resultData });
-        };
+    try {
+        const { imgData, settings, noiseSeed, width, height } = e.data;
+        const offscreenCanvas = new OffscreenCanvas(width, height);
+        const ctx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+        ctx.putImageData(imgData, 0, 0);
+
+        applyBasicFiltersManually(ctx, offscreenCanvas, settings);
+        await applyAdvancedFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
+        await applyGlitchEffects(ctx, offscreenCanvas, settings, noiseSeed, 1);
+        await applyComplexFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
+
+        const resultData = ctx.getImageData(0, 0, width, height);
+        self.postMessage({ imageData: resultData });
+    } catch (err) {
+        self.postMessage({ error: err.message });
+    }
+};
     `], { type: 'application/javascript' })));
 
+    const updateModalImage = throttle(() => {
+        modalImage.src = canvas.toDataURL('image/png');
+    }, 100);
+
     redrawWorker.onmessage = (e) => {
-        const start = performance.now();
         fullResCtx.putImageData(e.data.imageData, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = true;
@@ -238,14 +435,43 @@ if (window.Worker) {
         }
         if (modal?.style.display === 'block') {
             setTimeout(() => {
-                modalImage.src = canvas.toDataURL('image/png');
-                console.log("toDataURL time:", performance.now() - start);
+                modalImage.src = canvas.toDataURL('image/jpeg', 0.8);
             }, 0);
         }
-        saveImageState();
+        saveImageState(false, e.data.imageData); // Pass the worker's imageData explicitly
         showLoadingIndicator(false);
-        console.log("Main-thread post-worker time:", performance.now() - start);
     };
+}
+
+function scaleToFit(srcWidth, srcHeight, maxWidth, maxHeight) {
+    const aspectRatio = srcWidth / srcHeight;
+    const isVertical = aspectRatio < 1;
+    let width, height;
+
+    if (isVertical) {
+        height = Math.min(srcHeight, maxHeight);
+        width = Math.round(height * aspectRatio);
+        if (width > maxWidth) {
+            width = maxWidth;
+            height = Math.round(width / aspectRatio);
+        }
+    } else {
+        width = Math.min(srcWidth, maxWidth);
+        height = Math.round(width / aspectRatio);
+        if (height > maxHeight) {
+            height = maxHeight;
+            width = Math.round(height * aspectRatio);
+        }
+    }
+
+    const maxPixels = maxWidth * maxHeight;
+    if (width * height > maxPixels) {
+        const scale = Math.sqrt(maxPixels / (width * height));
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+    }
+
+    return { width, height };
 }
 
 function triggerFileUpload() {
@@ -264,11 +490,10 @@ function triggerFileUpload() {
             trueOriginalImage.onload = () => {
                 originalUploadedImage.src = event.target.result;
                 resetCropState(trueOriginalImage.width, trueOriginalImage.height);
-                showCropModal(event.target.result); // Pass the data URL explicitly
+                showCropModal(event.target.result);
             };
             cleanupFileInput();
         };
-        reader.onerror = cleanupFileInput;
         reader.readAsDataURL(file);
     });
     setTimeout(() => fileInput.click(), 0);
@@ -278,6 +503,7 @@ function triggerFileUpload() {
         }
     }, 1000);
 }
+
 function cleanupFileInput() {
     if (fileInput && document.body.contains(fileInput)) {
         document.body.removeChild(fileInput);
@@ -320,20 +546,18 @@ function updateControlIndicators() {
         'kaleidoscope-segments', 'kaleidoscope-offset',
         'vortex-twist', 'edge-detect'
     ];
+    const activeSettings = isDraggingSlider ? tempSettings : settings;
     controlValues.forEach(id => {
         const indicator = document.getElementById(`${id}-value`);
         if (indicator) {
-            indicator.textContent = id === 'kaleidoscope-segments' ? `${settings[id]}` : `${settings[id]}%`;
+            indicator.textContent = id === 'kaleidoscope-segments' ? `${activeSettings[id]}` : `${activeSettings[id]}%`;
         }
     });
 }
 
 function handleToggleOriginal(e) {
     e.preventDefault();
-    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) {
-        console.error("Cannot toggle: Original image is not loaded");
-        return;
-    }
+    if (!trueOriginalImage.complete || trueOriginalImage.naturalWidth === 0) return;
 
     isShowingOriginal = !isShowingOriginal;
     toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
@@ -348,10 +572,6 @@ function handleToggleOriginal(e) {
         } else {
             ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         }
-    }).catch(err => {
-        console.error("Toggle redraw failed:", err);
-        isShowingOriginal = !isShowingOriginal;
-        toggleOriginalButton.textContent = isShowingOriginal ? 'Editada' : 'Original';
     });
 }
 
@@ -361,47 +581,35 @@ toggleOriginalButton.addEventListener('touchend', handleToggleOriginal);
 img.onload = function () {
     originalWidth = img.width;
     originalHeight = img.height;
-    fullResCanvas.width = originalWidth;
-    fullResCanvas.height = originalHeight;
 
-    const maxDisplayWidth = Math.min(1920, window.innerWidth - 20);
-    const maxDisplayHeight = window.innerHeight - (window.innerWidth <= 768 ? 0.4 * window.innerHeight + 20 : 250);
-    const ratio = originalWidth / originalHeight;
+    // Step 1: Render low-res immediately (keep as is)
+    const lowRes = scaleToFit(originalWidth, originalHeight, LOW_RES_MAX_WIDTH, MAX_CANVAS_HEIGHT);
+    canvas.width = lowRes.width;
+    canvas.height = lowRes.height;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, lowRes.width, lowRes.height);
+    showLoadingIndicator(true);
 
-    let targetWidth = originalWidth;
-    let targetHeight = originalHeight;
-    const maxCanvasSize = 1920;
-    if (targetWidth > maxCanvasSize || targetHeight > maxCanvasSize) {
-        const scale = Math.min(maxCanvasSize / targetWidth, maxCanvasSize / targetHeight);
-        targetWidth = Math.round(targetWidth * scale);
-        targetHeight = Math.round(targetHeight * scale);
-    }
+    // Step 2: Prepare high-res in worker (optimize)
+    const highRes = scaleToFit(originalWidth, originalHeight, HIGH_RES_MAX_WIDTH, MAX_CANVAS_HEIGHT);
+    fullResCanvas.width = highRes.width;
+    fullResCanvas.height = highRes.height;
+    fullResCtx.drawImage(img, 0, 0, highRes.width, highRes.height);
 
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-
-    canvas.style.maxWidth = `${maxDisplayWidth}px`;
-    canvas.style.maxHeight = `${maxDisplayHeight}px`;
-    canvas.style.width = 'auto';
-    canvas.style.height = 'auto';
-    canvas.style.objectFit = 'contain';
-
+    // Use a Promise to handle worker processing asynchronously
     redrawImage(
         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
     ).then(() => {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = targetWidth;
-        tempCanvas.height = targetHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, 0, 0, targetWidth, targetHeight);
-        originalImageData = tempCtx.getImageData(0, 0, targetWidth, targetHeight);
+        originalImageData = fullResCtx.getImageData(0, 0, highRes.width, highRes.height);
         originalFullResImage.src = fullResCanvas.toDataURL('image/png');
         uploadNewPhotoButton.style.display = 'block';
         canvas.style.display = 'block';
+        showLoadingIndicator(false); // Move this here to ensure it hides after processing
     }).catch(err => {
-        console.error("Failed to redraw image on load:", err);
-        canvas.style.display = 'block';
+        console.error('Initial redraw failed:', err);
+        showLoadingIndicator(false);
     });
 };
 
@@ -469,7 +677,7 @@ downloadButton.addEventListener('click', () => {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
         tempCanvas.height = height;
-        const tempCtx = tempCanvas.getContext('2d');
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); // Updated        
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
         tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
@@ -494,7 +702,6 @@ downloadButton.addEventListener('click', () => {
         const extension = fileType.split('/')[1];
 
         if (fullResCanvas.width === 0 || fullResCanvas.height === 0) {
-            console.error("No valid image data available for download.");
             alert("No image available to download. Please upload an image.");
             document.body.removeChild(popup);
             document.body.removeChild(overlay);
@@ -507,15 +714,14 @@ downloadButton.addEventListener('click', () => {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
         tempCanvas.height = height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.imageSmoothingEnabled = true;
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+                tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
         tempCtx.drawImage(fullResCanvas, 0, 0, width, height);
 
         const quality = fileType === 'image/png' ? undefined : 1.0;
         tempCanvas.toBlob((blob) => {
             if (!blob || blob.size === 0) {
-                console.error("Generated blob is empty");
                 alert("Failed to generate downloadable image.");
                 showLoadingIndicator(false);
                 return;
@@ -542,17 +748,17 @@ downloadButton.addEventListener('click', () => {
     });
 });
 
-let isRedrawing = false;
-function saveImageState(isOriginal = false) {
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+function saveImageState(isOriginal = false, imageData = null) {
     if (isOriginal) {
-        history = [{ filters: { ...settings }, imageData }];
+        history = [{ filters: { ...settings }, imageData: ctx.getImageData(0, 0, canvas.width, canvas.height) }];
         redoHistory = [];
-        lastAppliedEffect = null;
+        lastModifiedSlider = null;
     } else {
         const lastState = history[history.length - 1];
+        // Use provided imageData or capture it from the canvas
+        const currentImageData = imageData || ctx.getImageData(0, 0, canvas.width, canvas.height);
         if (JSON.stringify(lastState.filters) !== JSON.stringify(settings)) {
-            history.push({ filters: { ...settings }, imageData });
+            history.push({ filters: { ...settings }, imageData: currentImageData });
             if (history.length > 50) history.shift();
             redoHistory = [];
         }
@@ -561,29 +767,24 @@ function saveImageState(isOriginal = false) {
 
 function handleUndo(e) {
     e.preventDefault();
-    if (history.length > 1) {
+    if (history.length > 1) { // Ensure there's something to undo beyond initial state
         const currentState = history.pop();
         redoHistory.push(currentState);
         const previousState = history[history.length - 1];
-        Object.assign(settings, previousState.filters);
-        document.querySelectorAll('.controls input').forEach(input => {
-            input.value = settings[input.id];
-        });
-        updateControlIndicators();
 
-        if (!img || !img.complete || img.naturalWidth === 0) {
-            console.error("handleUndo: img is invalid", img);
-            return;
+        // If the last state was a slider change, revert it
+        if (currentState.sliderId) {
+            const sliderId = currentState.sliderId;
+            settings[sliderId] = currentState.previousValue;
+            const slider = document.getElementById(sliderId);
+            if (slider) slider.value = currentState.previousValue;
+            lastModifiedSlider = sliderId;
+            updateControlIndicators();
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, false
+            );
         }
-
-        redrawImage(
-            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-            isShowingOriginal, trueOriginalImage, modal, modalImage, false
-        ).then(() => {
-            console.log("Undo redraw completed successfully");
-        }).catch(err => {
-            console.error("Undo redraw failed:", err);
-        });
     }
 }
 
@@ -592,23 +793,20 @@ function handleRedo(e) {
     if (redoHistory.length > 0) {
         const nextState = redoHistory.pop();
         history.push(nextState);
-        Object.assign(settings, nextState.filters);
-        document.querySelectorAll('.controls input').forEach(input => {
-            input.value = settings[input.id];
-        });
-        updateControlIndicators();
 
-        if (!img || !img.complete || img.naturalWidth === 0) {
-            console.error("handleRedo: No valid image available", img);
-            return;
+        // Apply the next slider change
+        if (nextState.sliderId) {
+            const sliderId = nextState.sliderId;
+            settings[sliderId] = nextState.newValue;
+            const slider = document.getElementById(sliderId);
+            if (slider) slider.value = nextState.newValue;
+            lastModifiedSlider = sliderId;
+            updateControlIndicators();
+            redrawImage(
+                ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                isShowingOriginal, trueOriginalImage, modal, modalImage, false
+            );
         }
-
-        redrawImage(
-            ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-            isShowingOriginal, trueOriginalImage, modal, modalImage, false
-        ).catch(err => {
-            console.error("Redo failed:", err);
-        });
     }
 }
 
@@ -636,20 +834,16 @@ addButtonListeners(redoButton, debouncedRedo);
 
 cropImageButton.addEventListener('click', (e) => {
     e.preventDefault();
-    if (!cropState.trueOriginalImage.src || cropState.trueOriginalImage.src === "") {
-        console.error("No original image source available to crop");
-        return;
+    if (cropState.trueOriginalImage.src && cropState.trueOriginalImage.src !== "") {
+        showCropModal(cropState.trueOriginalImage.src);
     }
-    showCropModal(cropState.trueOriginalImage.src).catch(err => console.error("Crop modal failed:", err));
 });
 
 cropImageButton.addEventListener('touchend', (e) => {
     e.preventDefault();
-    if (!cropState.trueOriginalImage.src || cropState.trueOriginalImage.src === "") {
-        console.error("No original image source available to crop");
-        return;
+    if (cropState.trueOriginalImage.src && cropState.trueOriginalImage.src !== "") {
+        showCropModal(cropState.trueOriginalImage.src);
     }
-    showCropModal(cropState.trueOriginalImage.src).catch(err => console.error("Crop modal failed:", err));
 });
 
 restoreButton.addEventListener('click', () => {
@@ -695,90 +889,110 @@ restoreButton.addEventListener('click', () => {
 
 let isDraggingSlider = false;
 let tempSettings = {};
+const debouncedRedraw = debounce(() => {
+    if (img.complete && img.naturalWidth !== 0) {
+        redrawImage(
+            ctx, canvas, fullResCanvas, fullResCtx, img, tempSettings, noiseSeed,
+            isShowingOriginal, trueOriginalImage, modal, modalImage, false
+        );
+    }
+}, 300);
+
 controls.forEach(control => {
-    control.addEventListener('touchstart', () => {
-        isDraggingSlider = true;
-        tempSettings = { ...settings };
-    }, { passive: true });
-    control.addEventListener('mousedown', () => {
-        isDraggingSlider = true;
-        tempSettings = { ...settings };
-    });
     control.addEventListener('input', (e) => {
-        const id = e.target.id;
-        const newValue = parseInt(e.target.value);
         if (isDraggingSlider) {
-            tempSettings[id] = newValue;
-        } else {
-            if (settings[id] !== newValue) {
-                settings[id] = newValue;
-                updateControlIndicators();
-                if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
-                    lastAppliedEffect = id;
-                }
-                saveImageState();
-            }
+            const id = e.target.id;
+            tempSettings[id] = parseInt(e.target.value);
+            updateControlIndicators();
+            debouncedRedraw();
         }
-        updateControlIndicators();
     });
+
     control.addEventListener('mouseup', () => {
         if (isDraggingSlider) {
             isDraggingSlider = false;
             const id = control.id;
-            if (settings[id] !== tempSettings[id]) {
-                settings[id] = tempSettings[id];
+            const newValue = parseInt(control.value);
+            if (settings[id] !== newValue) {
+                // Push the change to history
+                history.push({
+                    sliderId: id,
+                    previousValue: settings[id],
+                    newValue: newValue,
+                    imageData: ctx.getImageData(0, 0, canvas.width, canvas.height) // Optional: store image state
+                });
+                if (history.length > 50) history.shift(); // Limit history size
+                redoHistory = []; // Clear redo stack
+                settings[id] = newValue;
+                lastModifiedSlider = id; // Track the last slider
                 updateControlIndicators();
                 if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
                     lastAppliedEffect = id;
                 }
-                if (img.complete && img.naturalWidth !== 0) {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    ).then(() => {
-                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                    });
-                }
+                redrawImage(
+                    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                    isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+                ).then(() => {
+                    originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                });
             }
         }
     });
+
     control.addEventListener('touchend', () => {
+        // Same logic as mouseup
         if (isDraggingSlider) {
             isDraggingSlider = false;
             const id = control.id;
-            if (settings[id] !== tempSettings[id]) {
-                settings[id] = tempSettings[id];
+            const newValue = parseInt(control.value);
+            if (settings[id] !== newValue) {
+                history.push({
+                    sliderId: id,
+                    previousValue: settings[id],
+                    newValue: newValue,
+                    imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
+                });
+                if (history.length > 50) history.shift();
+                redoHistory = [];
+                settings[id] = newValue;
+                lastModifiedSlider = id;
                 updateControlIndicators();
                 if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
                     lastAppliedEffect = id;
                 }
-                if (img.complete && img.naturalWidth !== 0) {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    ).then(() => {
-                        originalFullResImage.src = fullResCanvas.toDataURL('image/png');
-                    });
-                }
+                redrawImage(
+                    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                    isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+                ).then(() => {
+                    originalFullResImage.src = fullResCanvas.toDataURL('image/png');
+                });
             }
         }
     });
+
     control.addEventListener('change', (e) => {
         if (!isDraggingSlider) {
             const id = e.target.id;
             const newValue = parseInt(e.target.value);
             if (settings[id] !== newValue) {
+                history.push({
+                    sliderId: id,
+                    previousValue: settings[id],
+                    newValue: newValue,
+                    imageData: ctx.getImageData(0, 0, canvas.width, canvas.height)
+                });
+                if (history.length > 50) history.shift();
+                redoHistory = [];
                 settings[id] = newValue;
+                lastModifiedSlider = id;
                 updateControlIndicators();
                 if (id.startsWith('glitch-') || id.startsWith('kaleidoscope-') || id === 'vortex-twist' || id === 'edge-detect') {
                     lastAppliedEffect = id;
                 }
-                if (img.complete && img.naturalWidth !== 0) {
-                    redrawImage(
-                        ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
-                        isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    );
-                }
+                redrawImage(
+                    ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
+                    isShowingOriginal, trueOriginalImage, modal, modalImage, false, saveImageState
+                );
             }
         }
     });
@@ -787,13 +1001,9 @@ controls.forEach(control => {
 canvas.addEventListener('click', (e) => {
     const isNotIOS = !/iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isNotIOS) {
-        try {
-            const controlsContainer = document.querySelector('.controls');
-            const modalControls = document.getElementById('modal-controls');
-            if (!controlsContainer || !modalControls) {
-                console.error("Controls container or modal controls not found");
-                return;
-            }
+        const controlsContainer = document.querySelector('.controls');
+        const modalControls = document.getElementById('modal-controls');
+        if (controlsContainer && modalControls) {
             const clonedControls = controlsContainer.cloneNode(true);
             modalControls.innerHTML = '';
             modalControls.appendChild(clonedControls);
@@ -813,9 +1023,7 @@ canvas.addEventListener('click', (e) => {
                     redrawImage(
                         ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed,
                         isShowingOriginal, trueOriginalImage, modal, modalImage, true, saveImageState
-                    ).catch(err => {
-                        console.error("Modal redraw failed:", err);
-                    });
+                    );
                 }, 500));
             });
 
@@ -826,8 +1034,6 @@ canvas.addEventListener('click', (e) => {
             if (modalCloseBtn) {
                 modalCloseBtn.focus();
             }
-        } catch (error) {
-            console.error("Error opening modal:", error);
         }
     }
 });

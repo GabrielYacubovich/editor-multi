@@ -1,3 +1,4 @@
+// utils.js
 export function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -6,10 +7,29 @@ export function debounce(func, wait) {
             func(...args);
         };
         clearTimeout(timeout);
-        timeout = setTimeout(later, wait); // Line 5
+        timeout = setTimeout(later, wait);
     };
 }
 
 export function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
+}
+
+export function throttle(func, limit) {
+    let lastFunc;
+    let lastRan;
+    return function (...args) {
+        if (!lastRan) {
+            func(...args);
+            lastRan = Date.now();
+        } else {
+            clearTimeout(lastFunc);
+            lastFunc = setTimeout(() => {
+                if ((Date.now() - lastRan) >= limit) {
+                    func(...args);
+                    lastRan = Date.now();
+                }
+            }, limit - (Date.now() - lastRan));
+        }
+    };
 }

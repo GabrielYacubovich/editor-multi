@@ -1,8 +1,6 @@
-
-// imageProcessing.js
 import { showLoadingIndicator } from './domUtils.js';
+import { redrawWorker } from './script.js'; // Import redrawWorker
 
-// Basic Filters
 function applyBasicFiltersManually(ctx, canvas, settings) {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
@@ -61,7 +59,6 @@ function applyBasicFiltersManually(ctx, canvas, settings) {
     ctx.putImageData(imageData, 0, 0);
 }
 
-// Advanced Filters
 function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve, reject) => {
         try {
@@ -105,13 +102,11 @@ function applyAdvancedFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
             ctx.putImageData(imageData, 0, 0);
             resolve();
         } catch (err) {
-            console.error("applyAdvancedFilters failed:", err);
             reject(err);
         }
     });
 }
 
-// Glitch Effects
 function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve, reject) => {
         try {
@@ -252,13 +247,11 @@ function applyGlitchEffects(ctx, canvas, settings, noiseSeed, scaleFactor) {
             ctx.putImageData(imageData, 0, 0);
             resolve();
         } catch (err) {
-            console.error("applyGlitchEffects failed:", err);
             reject(err);
         }
     });
 }
 
-// Complex Filters
 function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
     return new Promise((resolve, reject) => {
         try {
@@ -273,8 +266,8 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = width;
                 tempCanvas.height = height;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(imageData, 0, 0);
+                const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+                                tempCtx.putImageData(imageData, 0, 0);
                 ctx.clearRect(0, 0, width, height);
                 const centerX = clamp(width / 2 + offset, 0, width);
                 const centerY = clamp(height / 2 + offset, 0, height);
@@ -353,62 +346,75 @@ function applyComplexFilters(ctx, canvas, settings, noiseSeed, scaleFactor) {
             ctx.putImageData(imageData, 0, 0);
             resolve();
         } catch (err) {
-            console.error("applyComplexFilters failed:", err);
             reject(err);
         }
     });
 }
 
-// Redraw Image
-// In imageProcessing.js
-async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, saveState, saveImageStateCallback) {
+async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings, noiseSeed, isShowingOriginal, trueOriginalImage, modal, modalImage, saveState, saveImageStateCallback, preview = false) {
     if (!img.complete || img.naturalWidth === 0) {
-        console.error("redrawImage: img not loaded", img);
         showLoadingIndicator(false);
         return;
     }
-    showLoadingIndicator(true);
-    fullResCanvas.width = img.width;
-    fullResCanvas.height = img.height;
-    fullResCtx.drawImage(img, 0, 0);
+    if (saveState) showLoadingIndicator(true);
 
-    if (window.Worker && typeof redrawWorker !== 'undefined' && redrawWorker instanceof Worker) {
-        console.log("Using Web Worker for redraw");
-        const imageData = fullResCtx.getImageData(0, 0, img.width, img.height);
+    let targetCanvas = fullResCanvas;
+    let targetCtx = fullResCtx;
+    let width = img.width;
+    let height = img.height;
+
+    if (preview) {
+        const previewScale = 0.5;
+        width = Math.round(img.width * previewScale);
+        height = Math.round(img.height * previewScale);
+        targetCanvas = document.createElement('canvas');
+        targetCanvas.width = width;
+        targetCanvas.height = height;
+        targetCtx = targetCanvas.getContext('2d', { willReadFrequently: true });
+        targetCtx.drawImage(img, 0, 0, width, height);
+    } else {
+        fullResCanvas.width = img.width;
+        fullResCanvas.height = img.height;
+        targetCtx.drawImage(img, 0, 0);
+    }
+
+    if (redrawWorker) { // Check if worker exists
+        const imageData = targetCtx.getImageData(0, 0, width, height);
         return new Promise((resolve, reject) => {
             redrawWorker.onmessage = (e) => {
-                fullResCtx.putImageData(e.data.imageData, 0, 0);
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                if (isShowingOriginal && trueOriginalImage.complete) {
-                    ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
-                } else {
-                    ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
-                }
-                if (modal?.style.display === 'block') {
-                    modalImage.src = canvas.toDataURL('image/png');
-                }
-                if (saveState && saveImageStateCallback) {
-                    saveImageStateCallback();
-                }
-                showLoadingIndicator(false);
-                resolve();
+                targetCtx.putImageData(e.data.imageData, 0, 0);
+                requestAnimationFrame(() => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    if (isShowingOriginal && trueOriginalImage.complete) {
+                        ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
+                    } else {
+                        ctx.drawImage(targetCanvas, 0, 0, canvas.width, canvas.height);
+                    }
+                    if (modal?.style.display === 'block') {
+                        modalImage.src = canvas.toDataURL('image/png');
+                    }
+                    if (saveState && saveImageStateCallback) {
+                        saveImageStateCallback();
+                    }
+                    if (saveState) showLoadingIndicator(false);
+                    resolve();
+                });
             };
             redrawWorker.onerror = (err) => {
-                console.error("Worker error:", err);
-                showLoadingIndicator(false);
+                if (saveState) showLoadingIndicator(false);
                 reject(err);
             };
-            redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width: img.width, height: img.height });
+            redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width, height });
         });
     } else {
-        console.warn("Falling back to main thread redraw");
-        await new Promise(resolve => setTimeout(resolve, 0));
-        applyBasicFiltersManually(fullResCtx, fullResCanvas, settings);
-        await applyAdvancedFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
-        await applyGlitchEffects(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
-        await applyComplexFilters(fullResCtx, fullResCanvas, settings, noiseSeed, 1);
+        // Fallback to main thread if no worker support (e.g., older browsers)
+        console.warn('Web Workers not supported, processing on main thread');
+        applyBasicFiltersManually(targetCtx, targetCanvas, settings);
+        await applyAdvancedFilters(targetCtx, targetCanvas, settings, noiseSeed, 1);
+        await applyGlitchEffects(targetCtx, targetCanvas, settings, noiseSeed, 1);
+        await applyComplexFilters(targetCtx, targetCanvas, settings, noiseSeed, 1);
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.imageSmoothingEnabled = true;
@@ -416,7 +422,7 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
         if (isShowingOriginal && trueOriginalImage.complete) {
             ctx.drawImage(trueOriginalImage, 0, 0, canvas.width, canvas.height);
         } else {
-            ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
+            ctx.drawImage(targetCanvas, 0, 0, canvas.width, canvas.height);
         }
 
         if (modal?.style.display === 'block') {
@@ -425,10 +431,10 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
         if (saveState && saveImageStateCallback) {
             saveImageStateCallback();
         }
-        showLoadingIndicator(false);
+        if (saveState) showLoadingIndicator(false);
     }
 }
-// Utility function
+
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
