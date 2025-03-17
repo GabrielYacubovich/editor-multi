@@ -2,6 +2,7 @@
 import { closeModal, setupModal, showLoadingIndicator } from './domUtils.js';
 import { redrawImage } from './imageProcessing.js';
 import { applyBasicFiltersManually, applyAdvancedFilters, applyGlitchEffects, applyComplexFilters } from './imageProcessing.js';
+import { settings } from './script.js';
 
 export let cropImage = new Image();
 export let cropState = {};
@@ -236,7 +237,7 @@ function setupCropControls() {
             } else {
                 redrawImage(
                     cropState.ctx, cropState.canvas, cropState.fullResCanvas, cropState.fullResCtx,
-                    cropState.img, cropState.settings, cropState.noiseSeed,
+                    cropState.img, settings, cropState.noiseSeed, // Use main settings here
                     cropState.isShowingOriginal, cropState.trueOriginalImage, cropState.modal,
                     cropState.modalImage, true, cropState.saveImageState
                 ).then(() => {
@@ -359,7 +360,6 @@ function drawCropOverlayLight() {
     });
 }
 
-// Full version with image processing
 async function drawCropOverlayFull() {
     const originalWidth = cropImage.width;
     const originalHeight = cropImage.height;
@@ -381,14 +381,16 @@ async function drawCropOverlayFull() {
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = originalWidth;
     tempCanvas.height = originalHeight;
-    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true }); // Move this up
+
+    // Draw the initial image first
     tempCtx.drawImage(cropImage, 0, 0, originalWidth, originalHeight);
 
-    // Apply filters
-    applyBasicFiltersManually(tempCtx, tempCanvas, cropState.settings);
-    await applyAdvancedFilters(tempCtx, tempCanvas, cropState.settings, cropState.noiseSeed, 1);
-    await applyGlitchEffects(tempCtx, tempCanvas, cropState.settings, cropState.noiseSeed, 1);
-    await applyComplexFilters(tempCtx, tempCanvas, cropState.settings, cropState.noiseSeed, 1);
+    // Apply filters after tempCtx is initialized
+    applyBasicFiltersManually(tempCtx, tempCanvas, settings);
+    await applyAdvancedFilters(tempCtx, tempCanvas, settings, cropState.noiseSeed, 1);
+    await applyGlitchEffects(tempCtx, tempCanvas, settings, cropState.noiseSeed, 1);
+    await applyComplexFilters(tempCtx, tempCanvas, settings, cropState.noiseSeed, 1);
 
     // Draw rotated image with blur outside crop
     cropState.cropCtx.clearRect(0, 0, cropState.cropCanvas.width, cropState.cropCanvas.height);

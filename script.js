@@ -32,7 +32,7 @@ let isShowingOriginal = false;
 let originalFullResImage = new Image();
 let originalUploadedImage = new Image();
 let trueOriginalImage = new Image();
-let settings = {
+export let settings = {
     brightness: 100,
     contrast: 100,
     grayscale: 0,
@@ -869,6 +869,8 @@ restoreButton.addEventListener('click', () => {
         'vortex-twist': 0,
         'edge-detect': 0
     };
+    // Sync cropState.settings with the restored settings
+    cropState.settings = { ...settings };
     document.querySelectorAll('.controls input').forEach(input => {
         input.value = settings[input.id];
     });
