@@ -400,23 +400,23 @@ if (window.Worker) {
         }
 
         self.onmessage = async (e) => {
-    try {
-        const { imgData, settings, noiseSeed, width, height } = e.data;
-        const offscreenCanvas = new OffscreenCanvas(width, height);
-        const ctx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
-        ctx.putImageData(imgData, 0, 0);
+            try {
+                const { imgData, settings, noiseSeed, width, height } = e.data;
+                const offscreenCanvas = new OffscreenCanvas(width, height);
+                const ctx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+                ctx.putImageData(imgData, 0, 0);
 
-        applyBasicFiltersManually(ctx, offscreenCanvas, settings);
-        await applyAdvancedFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
-        await applyGlitchEffects(ctx, offscreenCanvas, settings, noiseSeed, 1);
-        await applyComplexFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
+                applyBasicFiltersManually(ctx, offscreenCanvas, settings);
+                await applyAdvancedFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
+                await applyGlitchEffects(ctx, offscreenCanvas, settings, noiseSeed, 1);
+                await applyComplexFilters(ctx, offscreenCanvas, settings, noiseSeed, 1);
 
-        const resultData = ctx.getImageData(0, 0, width, height);
-        self.postMessage({ imageData: resultData });
-    } catch (err) {
-        self.postMessage({ error: err.message });
-    }
-};
+                const resultData = ctx.getImageData(0, 0, width, height);
+                self.postMessage({ imageData: resultData });
+            } catch (err) {
+                self.postMessage({ error: err.message });
+            }
+        };
     `], { type: 'application/javascript' })));
 
     const updateModalImage = throttle(() => {
@@ -433,13 +433,9 @@ if (window.Worker) {
         } else {
             ctx.drawImage(fullResCanvas, 0, 0, canvas.width, canvas.height);
         }
-        if (modal?.style.display === 'block') {
-            setTimeout(() => {
-                modalImage.src = canvas.toDataURL('image/jpeg', 0.8);
-            }, 0);
-        }
-        saveImageState(false, e.data.imageData); // Pass the worker's imageData explicitly
+        saveImageState(false, e.data.imageData);
         showLoadingIndicator(false);
+        updateControlIndicators();
     };
 }
 

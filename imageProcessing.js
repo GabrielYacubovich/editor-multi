@@ -375,12 +375,13 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
     } else {
         fullResCanvas.width = img.width;
         fullResCanvas.height = img.height;
-        targetCtx.drawImage(img, 0, 0);
+        fullResCtx.drawImage(img, 0, 0);
     }
 
-    if (redrawWorker) { // Check if worker exists
+    if (redrawWorker) {
         const imageData = targetCtx.getImageData(0, 0, width, height);
         return new Promise((resolve, reject) => {
+            redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width, height });
             redrawWorker.onmessage = (e) => {
                 targetCtx.putImageData(e.data.imageData, 0, 0);
                 requestAnimationFrame(() => {
@@ -406,11 +407,9 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
                 if (saveState) showLoadingIndicator(false);
                 reject(err);
             };
-            redrawWorker.postMessage({ imgData: imageData, settings, noiseSeed, width, height });
         });
     } else {
-        // Fallback to main thread if no worker support (e.g., older browsers)
-        console.warn('Web Workers not supported, processing on main thread');
+        // Fallback: Apply filters directly
         applyBasicFiltersManually(targetCtx, targetCanvas, settings);
         await applyAdvancedFilters(targetCtx, targetCanvas, settings, noiseSeed, 1);
         await applyGlitchEffects(targetCtx, targetCanvas, settings, noiseSeed, 1);
@@ -432,6 +431,7 @@ async function redrawImage(ctx, canvas, fullResCanvas, fullResCtx, img, settings
             saveImageStateCallback();
         }
         if (saveState) showLoadingIndicator(false);
+        return Promise.resolve(); // Ensure the promise resolves
     }
 }
 
